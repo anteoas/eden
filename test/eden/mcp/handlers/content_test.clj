@@ -109,3 +109,38 @@
           (is (str/includes? content "# Heading") "Should preserve markdown"))
         ;; Clean up
         (.delete (io/file test-dir "content/en/blog.md"))))))
+
+(deftest test-list-content-returns-mcp-format
+  (testing "list-content should return MCP-compatible format"
+    (let [result (content/list-content test-config {})]
+      (is (contains? result :content) "Should have :content key")
+      (when-let [content (:content result)]
+        (is (vector? content) "Content should be a vector")
+        (when (seq content)
+          (let [item (first content)]
+            (is (map? item) "Content items should be maps")
+            (is (contains? item :type) "Content items should have :type field for MCP")
+            (is (#{"text" "image" "resource"} (:type item))
+                "Type should be valid MCP content type")))))))
+
+(deftest test-read-content-handles-invalid-paths
+  (testing "read-content should return error for non-existent files"
+    (let [result (content/read-content test-config {:path "nonexistent/file.edn"})]
+      (is (contains? result :error) "Should have :error key for non-existent file")
+      (is (string? (:error result)) "Error should be a string message")
+      (is (or (str/includes? (:error result) "not found")
+              (str/includes? (:error result) "does not exist"))
+          "Error message should indicate file not found")))
+
+  (testing "read-content should return error for paths outside content directory"
+    ;; Create a file outside content directory
+    (spit (str test-dir "/outside.txt") "secret data")
+    (let [result (content/read-content test-config {:path "../outside.txt"})]
+      (is (contains? result :error) "Should have :error key for invalid path")
+      (is (string? (:error result)) "Error should be a string message")
+      (is (or (str/includes? (:error result) "Invalid")
+              (str/includes? (:error result) "not allowed")
+              (str/includes? (:error result) "outside"))
+          "Error message should indicate invalid path"))
+    ;; Clean up
+    (.delete (io/file test-dir "outside.txt"))))

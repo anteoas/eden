@@ -2,7 +2,8 @@
   "MCP tool definitions for Eden"
   (:require [eden.mcp.handlers.content :as content]
             [eden.mcp.handlers.templates :as templates]
-            [eden.mcp.handlers.build :as build]))
+            [eden.mcp.handlers.build :as build]
+            [eden.mcp.handlers.docs :as docs]))
 
 (defn list-tools
   "List available MCP tools"
@@ -76,6 +77,36 @@
      :inputSchema
      {:type "object"
       :properties {}
+      :required []}}
+
+    {:name "get-documentation"
+     :description "Get documentation for Eden template system and content structure"
+     :inputSchema
+     {:type "object"
+      :properties {:topic {:type "string"
+                           :description "Topic: template-directives, content-schema, quickstart, site-config"}}
+      :required []}}
+
+    {:name "get-site-config"
+     :description "Get current site configuration from site.edn"
+     :inputSchema
+     {:type "object"
+      :properties {}
+      :required []}}
+
+    {:name "analyze-template"
+     :description "Analyze a template to show used fields and directives"
+     :inputSchema
+     {:type "object"
+      :properties {:template {:type "string"
+                              :description "Template name (without .edn extension)"}}
+      :required ["template"]}}
+
+    {:name "list-directives"
+     :description "List all available Eden template directives with brief descriptions"
+     :inputSchema
+     {:type "object"
+      :properties {}
       :required []}}]})
 
 (defn call-tool
@@ -90,4 +121,8 @@
     "preview-template" (templates/preview-template config arguments)
     "build-site" (build/build-site config arguments)
     "get-build-status" (build/get-build-status config arguments)
+    "get-documentation" (docs/get-documentation config arguments)
+    "get-site-config" (docs/get-site-config config arguments)
+    "analyze-template" (docs/analyze-template config arguments)
+    "list-directives" (docs/list-directives config arguments)
     {:error (str "Unknown tool: " tool-name)}))

@@ -15,23 +15,42 @@
       (if (.exists site-file)
         (let [site-root (.getParentFile site-file)
               api-config (assoc config :site-root site-root)
-              content (api/list-content api-config params)]
-          {:content content})
-        ;; Return empty content list if site file doesn't exist
-        {:content []}))
+              content (api/list-content api-config params)
+              formatted (if (empty? content)
+                          "No content files found."
+                          (str "Content Files (" (count content) " total):\n\n"
+                               (str/join "\n\n"
+                                         (map (fn [{:keys [path title template language type]}]
+                                                (str "• " path "\n"
+                                                     "  Title: " title "\n"
+                                                     "  Template: " template "\n"
+                                                     "  Language: " language
+                                                     (when type (str "\n  Type: " type))))
+                                              content))))]
+          {:content [{:type "text" :text formatted}]})
+        {:content [{:type "text" :text "No site file found"}]}))
     (catch Exception e
       {:error (.getMessage e)})))
 
 (defn read-content
-  "Read a content file and return its raw content"
+  "Read a specific content file"
   [config {:keys [path]}]
   (try
-    (let [site-root (-> (:site-edn config) io/file (.getParentFile))
-          api-config (assoc config :site-root site-root)
-          content (api/read-content api-config {:path path})]
-      (if content
-        {:content [{:type "text" :text content}]}
-        {:error (str "File not found: " path)}))
+    (let [site-edn (:site-edn config)
+          site-file (io/file site-edn)]
+      (if (.exists site-file)
+        (let [site-root (.getParentFile site-file)
+              api-config (assoc config :site-root site-root)
+              result (api/read-content api-config {:path path})]
+          (if (:error result)
+            result
+            {:content [{:type "text"
+                        :text (str "Path: " (:path result) "\n\n"
+                                   (when (:frontmatter result)
+                                     (str "Frontmatter:\n"
+                                          (pr-str (:frontmatter result)) "\n\n"))
+                                   "Content:\n" (:content result))}]}))
+        {:error "Site file not found"}))
     (catch Exception e
       {:error (.getMessage e)})))
 

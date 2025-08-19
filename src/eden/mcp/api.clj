@@ -40,12 +40,35 @@
                         (or (nil? template) (= (:template item) template)))))
          vec)))
 
+
 (defn read-content
-  "Read a content file and return its raw content."
+  "Read a specific content file."
   [{:keys [site-root]} {:keys [path]}]
-  (let [content-file (io/file site-root "content" path)]
-    (when (.exists content-file)
-      (slurp content-file))))
+  (try
+    (let [content-dir (io/file site-root "content")
+          content-file (io/file content-dir path)
+          canonical-content (when content-dir (.getCanonicalPath content-dir))
+          canonical-file (when content-file (.getCanonicalPath content-file))]
+      (cond
+        (not (.exists content-file))
+        {:error (str "File not found: content/" path)}
+
+        (not (and canonical-content
+                  canonical-file
+                  (str/starts-with? canonical-file canonical-content)))
+        {:error "Invalid path - cannot access files outside content directory"}
+
+        :else
+        (let [content (slurp content-file)]
+          (if (str/ends-with? path ".md")
+            (let [parsed (loader/parse-markdown content)]
+              {:path path
+               :frontmatter (:metadata parsed)
+               :content (:content parsed)})
+            {:path path
+             :content content}))))
+    (catch Exception e
+      {:error (str "Error reading file: " (.getMessage e))})))
 
 (defn write-content
   "Write content to a file with proper frontmatter formatting."
@@ -71,27 +94,41 @@
 (defn list-templates
   "List all available templates."
   [{:keys [site-root]}]
-  (let [templates-dir (io/file site-root "templates")
+  (let [templates-dir (if (instance? java.io.File site-root)
+                        (io/file site-root "templates")
+                        (io/file site-root "templates"))
         templates (when (.exists templates-dir)
-                    (loader/load-templates (.getPath templates-dir)))]
+                    (loader/load-templates templates-dir))]
     (->> templates
-         (map (fn [[name _]]
-                {:name (str name)
-                 :path (str "templates/" (name name) ".edn")}))
+         (map (fn [[k _]]
+                {:name (name k)
+                 :path (str "templates/" (name k) ".edn")}))
          vec)))
 
 (defn preview-template
   "Preview a template with sample data."
   [{:keys [site-root]} {:keys [template-name data]}]
-  (let [templates-dir (io/file site-root "templates")
-        templates (loader/load-templates (.getPath templates-dir))
+  (let [templates-dir (if (instance? java.io.File site-root)
+                        (io/file site-root "templates")
+                        (io/file site-root "templates"))
+        templates (loader/load-templates templates-dir)
         template (get templates (keyword template-name))]
     (when template
-      (let [;; Use site-generator to process the template
-            result (eden.site-generator/process template data)
+      (let [;; Convert :content to :content/html if needed
+            normalized-data (if (and (:content data) (not (:content/html data)))
+                              (-> data
+                                  (assoc :content/html (:content data))
+                                  (dissoc :content))
+                              data)
+            ;; Wrap data in :data key as expected by site-generator
+            context {:data normalized-data}
+            ;; Use site-generator to process the template
+            result (eden.site-generator/process template context)
+            ;; Extract the actual result (may be wrapped with warnings)
+            final-result (if (map? result) (:result result) result)
             ;; Render to HTML string
             html (replicant.string/render
-                  (eden.site-generator/prepare-for-render result))]
+                  (eden.site-generator/prepare-for-render final-result))]
         {:html html}))))
 
 ;; Build Operations

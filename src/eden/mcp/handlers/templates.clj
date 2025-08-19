@@ -10,13 +10,16 @@
   (try
     (let [site-root (-> (:site-edn config) io/file (.getParentFile))
           api-config (assoc config :site-root site-root)
-          templates (api/list-templates api-config)]
-      {:content [{:type "text"
-                  :text (str/join "\n\n"
-                                  (map (fn [t]
-                                         (str "Template: " (:name t) "\n"
-                                              "Path: " (:path t)))
-                                       templates))}]})
+          templates (api/list-templates api-config)
+          formatted (if (empty? templates)
+                      "No templates found."
+                      (str "Available Templates (" (count templates) "):\n\n"
+                           (str/join "\n\n"
+                                     (map (fn [t]
+                                            (str "• " (:name t) "\n"
+                                                 "  Path: " (:path t)))
+                                          templates))))]
+      {:content [{:type "text" :text formatted}]})
     (catch Exception e
       {:error (.getMessage e)})))
 
