@@ -1,0 +1,14 @@
+node_modules/
+public/
+.DS_Store
+*.log
+.nrepl-port
+.cpcache/
+out/
+.temp/
+dist/
+.clojure-mcp/
+coverage/
+CLAUDE.md
+llm/
+

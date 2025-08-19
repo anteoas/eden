@@ -1,0 +1,14 @@
+{
+  "name": "eden-site",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "clj -Teden dev :site-edn '\"site.edn\"'",
+    "build": "clj -Teden build :site-edn '\"site.edn\"' :mode '\"prod\"'",
+    "build:dev": "clj -Teden build :site-edn '\"site.edn\"' :mode '\"dev\"'",
+    "clean": "clj -Teden clean"
+  },
+  "devDependencies": {
+    "esbuild": "^0.19.0"
+  }
+}

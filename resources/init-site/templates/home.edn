@@ -1,0 +1,3 @@
+[:main
+ [:h1 [:eden/get :title]]
+ [:div.content [:eden/get :content/html]]]

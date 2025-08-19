@@ -1,0 +1,7 @@
+dist/
+node_modules/
+.temp/
+*.log
+.DS_Store
+.nrepl-port
+.cpcache/

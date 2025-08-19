@@ -1,0 +1,5 @@
+{:title "Hello Eden!"
+ :slug ""
+ :template :home
+ :content/html "<p>Welcome to your new Eden site!</p>
+<p>Edit <code>content/en/home.edn</code> to change this content.</p>"}

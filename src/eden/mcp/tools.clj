@@ -1,0 +1,93 @@
+(ns eden.mcp.tools
+  "MCP tool definitions for Eden"
+  (:require [eden.mcp.handlers.content :as content]
+            [eden.mcp.handlers.templates :as templates]
+            [eden.mcp.handlers.build :as build]))
+
+(defn list-tools
+  "List available MCP tools"
+  [_config]
+  {:tools
+   [{:name "list-content"
+     :description "List content files with metadata"
+     :inputSchema
+     {:type "object"
+      :properties {:language {:type "string"}
+                   :type {:type "string"
+                          :description "Filter by content type"}
+                   :template {:type "string"
+                              :description "Filter by template"}}
+      :required []}}
+
+    {:name "read-content"
+     :description "Read a content file with parsed frontmatter"
+     :inputSchema
+     {:type "object"
+      :properties {:path {:type "string"
+                          :description "Content file path relative to content/"}}
+      :required ["path"]}}
+
+    {:name "write-content"
+     :description "Create or update a content file"
+     :inputSchema
+     {:type "object"
+      :properties {:path {:type "string"}
+                   :frontmatter {:type "object"
+                                 :description "EDN frontmatter"}
+                   :content {:type "string"
+                             :description "Markdown content"}}
+      :required ["path" "content"]}}
+
+    {:name "delete-content"
+     :description "Delete a content file"
+     :inputSchema
+     {:type "object"
+      :properties {:path {:type "string"}
+                   :confirm {:type "boolean"
+                             :description "Confirm deletion"}}
+      :required ["path" "confirm"]}}
+
+    {:name "list-templates"
+     :description "List available templates with their requirements"
+     :inputSchema
+     {:type "object"
+      :properties {}
+      :required []}}
+
+    {:name "preview-template"
+     :description "Preview template with sample data"
+     :inputSchema
+     {:type "object"
+      :properties {:template {:type "string"}
+                   :data {:type "object"
+                          :description "Sample data for preview"}}
+      :required ["template"]}}
+
+    {:name "build-site"
+     :description "Trigger a site build"
+     :inputSchema
+     {:type "object"
+      :properties {:clean {:type "boolean"
+                           :description "Clean before building"}}
+      :required []}}
+
+    {:name "get-build-status"
+     :description "Get current build status and warnings"
+     :inputSchema
+     {:type "object"
+      :properties {}
+      :required []}}]})
+
+(defn call-tool
+  "Call a specific tool with arguments"
+  [config tool-name arguments]
+  (case tool-name
+    "list-content" (content/list-content config arguments)
+    "read-content" (content/read-content config arguments)
+    "write-content" (content/write-content config arguments)
+    "delete-content" (content/delete-content config arguments)
+    "list-templates" (templates/list-templates config arguments)
+    "preview-template" (templates/preview-template config arguments)
+    "build-site" (build/build-site config arguments)
+    "get-build-status" (build/get-build-status config arguments)
+    {:error (str "Unknown tool: " tool-name)}))

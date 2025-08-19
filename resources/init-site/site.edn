@@ -1,0 +1,37 @@
+{;; REQUIRED: Template that wraps all pages (provides HTML structure)
+ ;; The wrapper template receives the page content as :body
+ :wrapper :base
+
+ ;; REQUIRED: Homepage template (used for the root "/" URL)
+ :index :home
+
+ ;; REQUIRED: Set of root pages to render (dependencies are auto-discovered)
+ ;; Eden follows links from these pages to find all pages that need rendering
+ :render-roots #{:home}
+
+ ;; REQUIRED: Language configuration
+ ;; Each language needs a :name and optionally :default true for the main language
+ :lang {:en {:name "English"
+             :default true}} ; Default language has no URL prefix
+        ;; Add more languages like:
+        ;; :no {:name "Norsk"}  ; Would create /no/ URLs
+
+ ;; URL structure for generated files (default: :flat)
+ ;; :flat - Traditional structure: /page.html
+ ;; :nested - Clean URLs: /page/index.html (GitHub Pages compatible)
+ :url-strategy :nested
+
+ ;; URL format for links (default: :default)
+ ;; :default - Clean URLs without extensions: /about
+ ;; :with-extension - Traditional URLs: /about.html
+ ;; :page-url-strategy :default
+
+ ;; Enable image processing and optimization (default: false)
+ ;; When true, images referenced in HTML/CSS are automatically optimized
+ ;; :image-processor false
+
+ ;; Directory paths (relative to site.edn location)
+ ;; :templates "templates"  ; Where template files are stored (default)
+ ;; :content "content"      ; Where content files are stored (default)
+ ;; :assets "assets"        ; Where CSS/JS/images are stored (default)
+ }
