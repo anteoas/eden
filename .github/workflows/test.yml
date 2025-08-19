@@ -35,6 +35,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-deps-
     
+    - name: Prepare dependencies
+      run: clj -X:deps prep
+    
     - name: Run tests
       run: clj -M:test
     
