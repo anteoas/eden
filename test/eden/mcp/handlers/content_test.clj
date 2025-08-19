@@ -124,23 +124,34 @@
                 "Type should be valid MCP content type")))))))
 
 (deftest test-read-content-handles-invalid-paths
-  (testing "read-content should return error for non-existent files"
+  (testing "read-content should return MCP-formatted error for non-existent files"
     (let [result (content/read-content test-config {:path "nonexistent/file.edn"})]
-      (is (contains? result :error) "Should have :error key for non-existent file")
-      (is (string? (:error result)) "Error should be a string message")
-      (is (or (str/includes? (:error result) "not found")
-              (str/includes? (:error result) "does not exist"))
-          "Error message should indicate file not found")))
+      (is (contains? result :content) "Should have :content key for MCP format")
+      (is (vector? (:content result)) "Content should be a vector")
 
-  (testing "read-content should return error for paths outside content directory"
+      (when-let [content (:content result)]
+        (let [item (first content)]
+          (is (= "text" (:type item)) "Should have type text")
+          (is (string? (:text item)) "Text should be a string")
+          (is (str/includes? (:text item) "Error:") "Should start with Error:")
+          (is (or (str/includes? (:text item) "not found")
+                  (str/includes? (:text item) "does not exist"))
+              "Error message should indicate file not found")))))
+
+  (testing "read-content should return MCP-formatted error for paths outside content directory"
     ;; Create a file outside content directory
     (spit (str test-dir "/outside.txt") "secret data")
     (let [result (content/read-content test-config {:path "../outside.txt"})]
-      (is (contains? result :error) "Should have :error key for invalid path")
-      (is (string? (:error result)) "Error should be a string message")
-      (is (or (str/includes? (:error result) "Invalid")
-              (str/includes? (:error result) "not allowed")
-              (str/includes? (:error result) "outside"))
-          "Error message should indicate invalid path"))
+      (is (contains? result :content) "Should have :content key for MCP format")
+
+      (when-let [content (:content result)]
+        (let [item (first content)]
+          (is (= "text" (:type item)) "Should have type text")
+          (is (str/includes? (:text item) "Error:") "Should contain Error:")
+          (is (or (str/includes? (:text item) "Invalid")
+                  (str/includes? (:text item) "not allowed")
+                  (str/includes? (:text item) "outside")
+                  (str/includes? (:text item) "not found"))
+              "Error message should indicate invalid path"))))
     ;; Clean up
     (.delete (io/file test-dir "outside.txt"))))

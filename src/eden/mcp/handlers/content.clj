@@ -44,16 +44,20 @@
               api-config (assoc config :site-root site-root)
               result (api/read-content api-config {:path path})]
           (if (:error result)
-            result
+            ;; Return error in MCP format
+            {:content [{:type "text"
+                        :text (str "Error: " (:error result))}]}
             {:content [{:type "text"
                         :text (str "Path: " (:path result) "\n\n"
                                    (when (:frontmatter result)
                                      (str "Frontmatter:\n"
                                           (pr-str (:frontmatter result)) "\n\n"))
                                    "Content:\n" (:content result))}]}))
-        {:error "Site file not found"}))
+        {:content [{:type "text"
+                    :text "Error: Site file not found"}]}))
     (catch Exception e
-      {:error (.getMessage e)})))
+      {:content [{:type "text"
+                  :text (str "Error: " (.getMessage e))}]})))
 
 (defn write-content
   "Create or update a content file - simulates first, then writes"
