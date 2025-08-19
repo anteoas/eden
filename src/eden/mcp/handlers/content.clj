@@ -2,6 +2,7 @@
   "Content management handlers for MCP"
   (:require [clojure.string :as str]
             [clojure.java.io :as io]
+            [clojure.edn :as edn]
             [eden.mcp.api :as api]
             [eden.mcp.simulator :as simulator]
             [eden.loader :as loader]))
@@ -58,10 +59,20 @@
   "Create or update a content file - simulates first, then writes"
   [config {:keys [path frontmatter content]}]
   (try
-    ;; Format the content for simulation
-    (let [formatted-content (if (str/ends-with? path ".md")
-                              (loader/format-frontmatter frontmatter content)
-                              (pr-str (merge frontmatter {:content content})))
+    ;; Parse EDN frontmatter if it's a string
+    (let [parsed-frontmatter (if (string? frontmatter)
+                               (try
+                                 (edn/read-string frontmatter)
+                                 (catch Exception e
+                                   (throw (ex-info "Invalid EDN in frontmatter"
+                                                   {:frontmatter frontmatter
+                                                    :error (.getMessage e)}))))
+                               frontmatter)
+
+          ;; Format the content for simulation
+          formatted-content (if (str/ends-with? path ".md")
+                              (loader/format-frontmatter parsed-frontmatter content)
+                              (pr-str (merge parsed-frontmatter {:content content})))
 
           ;; First simulate the change to validate it
           sim-result (simulator/simulate-content-change
@@ -74,7 +85,7 @@
         (let [site-root (-> (:site-edn config) io/file (.getParentFile))
               api-config (assoc config :site-root site-root)]
           (api/write-content api-config {:path path
-                                         :frontmatter frontmatter
+                                         :frontmatter parsed-frontmatter
                                          :content content})
           ;; Trigger rebuild
           (api/build-site config {:clean false})

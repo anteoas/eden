@@ -71,11 +71,10 @@
               (is (str/includes? text "home") "Should list home template"))))))))
 
 (deftest test-preview-template-returns-html
-  (testing "preview-template should return rendered HTML"
+  (testing "preview-template should return rendered HTML with EDN data string"
     (let [result (templates/preview-template test-config
                                              {:template "home"
-                                              :data {:title "Test Title"
-                                                     :content "Test content"}})]
+                                              :data "{:title \"Test Title\" :content \"Test content\"}"})]
       (is (not (:error result)) "Should not have error")
       (is (contains? result :content) "Should have :content key")
 
@@ -89,4 +88,18 @@
             (is (= "text" (:type item)) "Should have type :text")
             (is (string? (:text item)) "Should have text content")
             (is (str/includes? (:text item) "Test Title")
-                "Should include the provided title")))))))
+                "Should include the provided title"))))))
+
+  (testing "preview-template should handle map data for backwards compatibility"
+    (let [result (templates/preview-template test-config
+                                             {:template "home"
+                                              :data {:title "Test Title"
+                                                     :content "Test content"}})]
+      (is (not (:error result)) "Should not have error")
+      (is (contains? result :content) "Should have :content key")))
+
+  (testing "preview-template should error on invalid EDN"
+    (let [result (templates/preview-template test-config
+                                             {:template "home"
+                                              :data "{:title \"Missing closing brace\""})]
+      (is (:error result) "Should have error for invalid EDN"))))

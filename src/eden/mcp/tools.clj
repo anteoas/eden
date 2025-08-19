@@ -32,9 +32,10 @@
      :description "Create or update a content file"
      :inputSchema
      {:type "object"
-      :properties {:path {:type "string"}
-                   :frontmatter {:type "object"
-                                 :description "EDN frontmatter"}
+      :properties {:path {:type "string"
+                          :description "Content file path relative to content/"}
+                   :frontmatter {:type "string"
+                                 :description "EDN frontmatter as string, e.g. '{:title \"My Post\" :template :blog}'"}
                    :content {:type "string"
                              :description "Markdown content"}}
       :required ["path" "content"]}}
@@ -59,9 +60,10 @@
      :description "Preview template with sample data"
      :inputSchema
      {:type "object"
-      :properties {:template {:type "string"}
-                   :data {:type "object"
-                          :description "Sample data for preview"}}
+      :properties {:template {:type "string"
+                              :description "Template name (without .edn extension)"}
+                   :data {:type "string"
+                          :description "EDN data as string, e.g. '{:title \"Test\" :content/html \"<p>Hello</p>\"}'"}}
       :required ["template"]}}
 
     {:name "build-site"
