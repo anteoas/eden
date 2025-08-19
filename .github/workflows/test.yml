@@ -40,6 +40,3 @@ jobs:
     
     - name: Run tests
       run: clj -M:test
-    
-    - name: Check reflection warnings
-      run: clj -M:test --focus eden.reflection-test
