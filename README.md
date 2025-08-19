@@ -19,7 +19,7 @@ Eden is a Clojure static site generator designed for content-driven websites.
 ```bash
 # Install Eden as a tool
 clj -Ttools install io.github.anteoas/eden \
-  '{:git/url "https://github.com/anteoas/eden.git" :git/tag "v1.0.0"}' \
+  '{:git/url "https://github.com/anteoas/eden.git" :git/tag "v2025.08.19"}' \
   :as eden
 
 # Create and initialize a new site
