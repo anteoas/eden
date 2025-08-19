@@ -5,7 +5,9 @@
             [clojure.walk :as walk]
             [clojure.edn :as edn]
             [eden.loader :as loader]
-            [eden.site-generator :as sg]))
+            [eden.site-generator :as sg]
+            [eden.mcp.api :as api])
+  (:import [java.io File]))
 
 (def directive-descriptions
   {:eden/get "Retrieves a value from the current context data"
@@ -121,15 +123,24 @@
   (try
     (let [site-root (-> (:site-edn config) io/file (.getParentFile))
           templates-dir (io/file site-root "templates")
-          template-file (io/file templates-dir (str template ".edn"))]
-      (if (.exists template-file)
+          template-file (api/safe-resolve-path templates-dir (str template ".edn"))]
+      (cond
+        (nil? template-file)
+        {:content [{:type "text"
+                    :text "Error: Invalid template path"}]}
+
+        (not (File/.exists template-file))
+        {:content [{:type "text"
+                    :text (str "Error: Template not found: " template)}]}
+
+        :else
         (let [template-data (edn/read-string (slurp template-file))
               analysis (analyze-template-structure template-data)
               formatted (format-template-analysis template analysis)]
-          {:content [{:type "text" :text formatted}]})
-        {:error (str "Template not found: " template)}))
+          {:content [{:type "text" :text formatted}]})))
     (catch Exception e
-      {:error (.getMessage e)})))
+      {:content [{:type "text"
+                  :text (str "Error: " (.getMessage e))}]})))
 
 (defn list-directives
   "List all available Eden template directives"

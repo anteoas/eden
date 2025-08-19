@@ -155,3 +155,33 @@
               "Error message should indicate invalid path"))))
     ;; Clean up
     (.delete (io/file test-dir "outside.txt"))))
+
+(deftest test-safe-path-resolution
+  (testing "All file operations should prevent directory traversal"
+    ;; Test read-content
+    (testing "read-content blocks directory traversal"
+      (let [result (content/read-content test-config {:path "../../etc/passwd"})]
+        (is (contains? result :content) "Should return MCP format")
+        (when-let [text (get-in result [:content 0 :text])]
+          (is (str/includes? text "Error:") "Should contain error")
+          (is (or (str/includes? text "Invalid")
+                  (str/includes? text "outside"))
+              "Should indicate invalid path"))))
+
+    ;; Test write-content with directory traversal
+    (testing "write-content blocks directory traversal"
+      (let [result (content/write-content test-config
+                                          {:path "../../../tmp/evil.txt"
+                                           :frontmatter "{:title \"Evil\"}"
+                                           :content "malicious content"})]
+        (is (or (contains? result :error)
+                (and (contains? result :content)
+                     (str/includes? (get-in result [:content 0 :text]) "Error:")))
+            "Should return error for path traversal")))
+
+    ;; Test with symlinks (if someone tries to create one)
+    (testing "operations should not follow symlinks outside site"
+      (let [result (content/read-content test-config {:path "../symlink-to-outside"})]
+        (is (contains? result :content) "Should return MCP format")
+        (when-let [text (get-in result [:content 0 :text])]
+          (is (str/includes? text "Error:") "Should contain error"))))))

@@ -7,7 +7,22 @@
             [eden.loader :as loader]
             [eden.pipeline :as pipeline]
             [eden.site-generator]
-            [replicant.string]))
+            [replicant.string])
+  (:import [java.io File]))
+
+(defn safe-resolve-path
+  "Safely resolve a path within a base directory, preventing directory traversal.
+   Returns the resolved file or nil if the path would escape the base directory."
+  [base-dir relative-path]
+  (try
+    (let [base-file (io/file base-dir)
+          base-canonical (File/.getCanonicalPath base-file)
+          target-file (io/file base-dir relative-path)
+          target-canonical (File/.getCanonicalPath target-file)]
+      (when (str/starts-with? target-canonical base-canonical)
+        target-file))
+    (catch Exception _
+      nil)))
 
 ;; Content Operations
 
@@ -40,23 +55,18 @@
                         (or (nil? template) (= (:template item) template)))))
          vec)))
 
-
 (defn read-content
   "Read a specific content file."
   [{:keys [site-root]} {:keys [path]}]
   (try
     (let [content-dir (io/file site-root "content")
-          content-file (io/file content-dir path)
-          canonical-content (when content-dir (.getCanonicalPath content-dir))
-          canonical-file (when content-file (.getCanonicalPath content-file))]
+          content-file (safe-resolve-path content-dir path)]
       (cond
-        (not (.exists content-file))
-        {:error (str "File not found: content/" path)}
-
-        (not (and canonical-content
-                  canonical-file
-                  (str/starts-with? canonical-file canonical-content)))
+        (nil? content-file)
         {:error "Invalid path - cannot access files outside content directory"}
+
+        (not (File/.exists content-file))
+        {:error (str "File not found: content/" path)}
 
         :else
         (let [content (slurp content-file)]
@@ -68,26 +78,43 @@
             {:path path
              :content content}))))
     (catch Exception e
-      {:error (str "Error reading file: " (.getMessage e))})))
+      {:error (str "Error reading file: " (Throwable/.getMessage e))})))
 
 (defn write-content
   "Write content to a file with proper frontmatter formatting."
   [{:keys [site-root]} {:keys [path content frontmatter]}]
-  (let [content-file (io/file site-root "content" path)
-        formatted (if (str/ends-with? path ".md")
-                    (loader/format-frontmatter frontmatter content)
-                    (pr-str (merge frontmatter {:content content})))]
-    (fs/create-dirs (.getParentFile content-file))
-    (spit content-file formatted)
-    {:success true :path path}))
+  (let [content-dir (io/file site-root "content")
+        content-file (safe-resolve-path content-dir path)]
+    (when (nil? content-file)
+      (throw (ex-info "Invalid path - cannot write files outside content directory"
+                      {:path path})))
+
+    (let [parent-dir (File/.getParentFile content-file)]
+      (when-not (File/.exists parent-dir)
+        (fs/create-dirs parent-dir))
+
+      (if (str/ends-with? path ".md")
+        (spit content-file (loader/format-frontmatter frontmatter content))
+        (spit content-file (pr-str frontmatter)))
+
+      {:success true :path path})))
 
 (defn delete-content
   "Delete a content file."
   [{:keys [site-root]} {:keys [path]}]
-  (let [content-file (io/file site-root "content" path)]
-    (when (.exists content-file)
-      (fs/delete content-file)
-      {:success true :path path})))
+  (let [content-dir (io/file site-root "content")
+        content-file (safe-resolve-path content-dir path)]
+    (cond
+      (nil? content-file)
+      {:error "Invalid path - cannot delete files outside content directory"}
+
+      (not (File/.exists content-file))
+      {:error (str "File not found: content/" path)}
+
+      :else
+      (do
+        (fs/delete content-file)
+        {:success true :path path}))))
 
 ;; Template Operations
 
@@ -97,7 +124,7 @@
   (let [templates-dir (if (instance? java.io.File site-root)
                         (io/file site-root "templates")
                         (io/file site-root "templates"))
-        templates (when (.exists templates-dir)
+        templates (when (File/.exists templates-dir)
                     (loader/load-templates templates-dir))]
     (->> templates
          (map (fn [[k _]]
