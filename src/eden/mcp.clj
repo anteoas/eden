@@ -152,7 +152,7 @@
       (mcp-core/build-and-start-mcp-server
        mcp-config
        {:make-tools-fn make-minimal-tools
-        :make-prompts-fn make-eden-prompts ; Use Eden-specific prompts
+        :make-prompts-fn make-eden-prompts
         :make-resources-fn make-eden-resources})
 
       (println "\nEden MCP server ready!")
@@ -162,9 +162,6 @@
       (println "  - Run git and build commands")
       (println "  - Access Eden documentation via resources")
       (println "  - Use Eden-specific prompts for common tasks")
-
-      ;; Keep the process running
-      (Thread/sleep Long/MAX_VALUE)
 
       (catch Exception e
         (println "Error starting MCP server:" (.getMessage e))
