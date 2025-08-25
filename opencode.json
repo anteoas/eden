@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "clojure-mcp": {
+      "type": "local",
+      "command": ["/bin/sh",
+		  "-c",
+		  "PORT=$(cat .nrepl-port); cd /Users/peder/scratch/clojure-mcp && clojure -X:mcp :port $PORT"],
+      "enabled": true,
+      "environment": {
+      }
+    }
+  }
+}

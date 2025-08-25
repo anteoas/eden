@@ -22,7 +22,7 @@ Configuration → Loading → Processing → Rendering → Output
 - **`eden.renderer`** - HTML generation and page assembly
 - **`eden.builder`** - File output and asset copying
 - **`eden.pipeline`** - Build orchestration
-- **`eden.mcp.*`** - MCP server and handlers
+- **`eden.mcp`** - MCP server with clojure-mcp integration
 
 ## Build Pipeline
 
@@ -379,56 +379,34 @@ Merge map data into context:
 
 ## MCP Protocol
 
-Eden implements the Model Context Protocol for AI integration.
+Eden implements the Model Context Protocol for AI integration using [clojure-mcp](https://github.com/bhauman/clojure-mcp).
 
-### Server Modes
+### Server Architecture
 
-1. **HTTP Mode** (`eden.mcp.server`)
-   - Runs on configurable port
-   - Optional authentication
-   - CORS support
-
-2. **STDIO Mode** (`eden.mcp.stdio`)
-   - Direct process communication
-   - For Claude Desktop integration
+The MCP server (`eden.mcp`) runs as a single process with an embedded nREPL server, providing direct access to Eden's build system and REPL capabilities.
 
 ### Available Tools
 
-Tools are defined in `eden.mcp.tools`:
+Through clojure-mcp integration, Eden provides:
 
-- **Content Management**
-  - `list_content` - List all content files
-  - `read_content` - Read specific content
-  - `write_content` - Create/update content
-  - `delete_content` - Remove content
+- **File Operations** - Read, write, and edit files with Clojure awareness
+- **REPL Evaluation** - Direct access to Eden functions via `clojure_eval`
+- **Shell Commands** - Execute bash commands in the project context
+- **Project Navigation** - Search and navigate the codebase
 
-- **Template Management**
-  - `list_templates` - List all templates
-  - `read_template` - Read template source
-  - `preview_template` - Render template preview
+### Eden-Specific Features
 
-- **Build Operations**
-  - `build_site` - Trigger full build
-  - `get_build_status` - Check build progress
-  - `get_build_report` - Get last build report
+The MCP server includes Eden-specific resources and prompts:
 
-- **Configuration**
-  - `get_config` - Read site configuration
-  - `update_config` - Modify settings
+- **Resources**
+  - Eden Template Directives documentation
+  - Content Structure guide
+  - Site Configuration reference
 
-### MCP Handler Architecture
-
-Each handler namespace implements specific functionality:
-
-```clojure
-(ns eden.mcp.handlers.content)
-
-(defn list-content [config arguments]
-  {:content (list-all-content config)})
-
-(defn read-content [config {:keys [lang path]}]
-  {:content (load-content-file config lang path)})
-```
+- **Prompts**
+  - `eden_project_context` - Project understanding
+  - `eden_create_page` - Page creation guide
+  - `eden_debug_build` - Build troubleshooting
 
 ### Resources and Prompts
 
@@ -593,22 +571,9 @@ Test full build pipeline:
     (is (fs/exists? "dist/index.html"))))
 ```
 
-### MCP Simulator
+### Working with MCP
 
-The MCP simulator validates content changes before writing to disk:
-
-```clojure
-(require '[eden.mcp.simulator :as sim])
-
-;; Simulate a content change to validate it
-(sim/simulate-content-change
-  {:site-edn "site.edn"
-   :path "en/home.edn"
-   :content "{:title \"New Title\"}"})
-;; Returns: {:success? true, :html "...", :warnings [...]}
-```
-
-Used by MCP handlers to:
+The MCP server enables AI assistants to:
 - Validate content syntax before writing
 - Preview rendered HTML
 - Catch template errors early

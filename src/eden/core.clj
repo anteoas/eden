@@ -171,61 +171,18 @@
   [_] ; Accept but ignore params for tool compatibility
   (init/create-site))
 
-(defn mcp
-  "Start MCP server in production mode with authentication"
-  [& {:keys [site-edn port secret]
-      :or {site-edn "site.edn"}}]
-  (let [port (or port (find-available-port 3000 4000))
-        secret (or secret (str (java.util.UUID/randomUUID)))]
-    (println "Starting MCP server...")
-    (println (str "MCP URL: http://localhost:" port "/mcp/" secret "/"))
-    (println "Save this URL for connecting MCP clients")
-    (println "For HTTPS, use a reverse proxy (nginx, caddy, etc.)")
-    (mcp/start-server site-edn port secret)))
+;; Removed - HTTP MCP server no longer supported
+;; Use mcp-stdio for Claude Desktop integration
 
-(defn mcp-dev
-  "Start MCP server in development mode (no auth)"
-  [& {:keys [site-edn port]
-      :or {site-edn "site.edn"}}]
-  (require '[eden.mcp :as mcp])
-
-  ;; Build the site first
-  (println "Building site...")
-  (build :site-edn site-edn :mode :dev)
-
-  ;; Find available ports for both servers
-  (let [mcp-port (or port (find-available-port 3000 4000))
-        browser-sync-port (find-available-port 3100 4000)
-        browser-sync-proc (process/start
-                           {:out :inherit
-                            :err :inherit}
-                           "npx" "browser-sync" "start"
-                           "--server" "dist"
-                           "--files" "dist/**/*"
-                           "--port" (str browser-sync-port)
-                           "--no-notify"
-                           "--no-open")]
-    ;; Start browser-sync
-    (println "\nStarting MCP development server...")
-    (println (str "MCP URL: http://localhost:" mcp-port "/mcp/"))
-    (println (str "Browser-sync URL: http://localhost:" browser-sync-port))
-    (println "⚠️  WARNING: No authentication - development only!")
-
-    ;; Add shutdown hook to kill browser-sync when JVM exits
-    (.addShutdownHook (Runtime/getRuntime)
-                      (Thread. (fn []
-                                 (when (.isAlive browser-sync-proc)
-                                   (.destroy browser-sync-proc)))))
-
-    ;; Start MCP server with browser-sync port in config
-    (mcp/start-dev-server-with-browser-sync
-     site-edn mcp-port browser-sync-port)))
+;; Removed - HTTP MCP server no longer supported
+;; Use mcp-stdio for Claude Desktop integration
 
 (defn mcp-stdio
   "Start MCP server in stdio mode (for Claude Desktop)"
   [& {:keys [site-edn]
       :or {site-edn "site.edn"}}]
   (require '[eden.mcp :as mcp])
+  (println "Starting Eden MCP server...")
   (mcp/start-stdio-server site-edn))
 
 (defn help
@@ -238,8 +195,6 @@
   (println "  clj -Teden build        - Build the site (production mode)")
   (println "  clj -Teden dev          - Start development server with file watching")
   (println "  clj -Teden clean        - Clean build artifacts")
-  (println "  clj -Teden mcp          - Start MCP server (production mode with auth)")
-  (println "  clj -Teden mcp-dev      - Start MCP server (dev mode, no auth)")
   (println "  clj -Teden mcp-stdio    - Start MCP server in stdio mode (for Claude Desktop)")
   (println "  clj -Teden help         - Show this help message")
   (println)
@@ -247,18 +202,13 @@
   (println "  :site-edn '\"path\"'     - Path to site.edn (default: \"site.edn\")")
   (println "  :mode '\"dev/prod\"'     - Build mode (build command only)")
   (println)
-  (println "MCP options:")
-  (println "  :port '3000'           - Port for MCP server (auto-assigned if not specified)")
-  (println "  :secret '\"uuid\"'       - Authentication secret (mcp command, auto-generated if not specified)")
-  (println)
   (println "Examples:")
   (println "  clj -Teden build :site-edn '\"site.edn\"' :mode '\"prod\"'")
   (println "  clj -Teden dev :site-edn '\"mysite/site.edn\"'")
-  (println "  clj -Teden mcp-dev                        - Start with auto-assigned ports")
-  (println "  clj -Teden mcp-dev :port '3000'           - Start with specific port")
   (println)
   (println "MCP stdio mode (for Claude Desktop):")
-  (println "  clj -Teden mcp-stdio                      - Run as stdio server"))
+  (println "  clj -Teden mcp-stdio                      - Run as stdio server")
+  (println "  clj -M:mcp                                 - Alternative using alias"))
 
 (defn -main
   "CLI entry point for site generator.

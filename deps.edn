@@ -16,6 +16,12 @@
         ring/ring-core {:mvn/version "1.12.1"}
         ring/ring-jetty-adapter {:mvn/version "1.12.1"}
         ring/ring-json {:mvn/version "0.5.1"}
+        com.bhauman/clojure-mcp {:git/url "https://github.com/bhauman/clojure-mcp.git"
+                                 :git/tag "v0.1.8-alpha"
+                                 :git/sha "457f197"}
+
+        ;; nREPL for integrated MCP server
+        nrepl/nrepl {:mvn/version "1.3.1"}
 
         ;; SLF4J no-op implementation to suppress warnings
         org.slf4j/slf4j-nop {:mvn/version "2.0.9"}}
@@ -39,4 +45,7 @@
                   :main-opts ["-m" "kaocha.runner"]}
            :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
                    :jvm-opts ["-Djdk.attach.allowAttachSelf"]
-                   :main-opts ["-m" "nrepl.cmdline"]}}}
+                   :main-opts ["-m" "nrepl.cmdline"]}
+           :mcp {:exec-fn eden.mcp/start-stdio-server
+                 :exec-args {}
+                 :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}}}
