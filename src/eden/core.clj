@@ -107,16 +107,21 @@
     (throw (ex-info "Missing required :site-edn parameter" {})))
 
   (println "Starting file watcher...")
-  (let [site-dir (.getParent (io/file site-edn))
+  (let [site-dir (-> (io/file site-edn)
+                     (.getCanonicalFile)
+                     (.getParent))
+        ;; Calculate the absolute path of the output directory to filter it out
+        output-path (.getCanonicalPath (io/file site-dir output-dir))
         debounced-build (hawk/debounce
                          (fn [event]
-                           ;; With :events :last, we get the event directly, not in a collection
-                           (println (format "\nChange detected: %s" (:path event)))
-                           (try
-                             (build :site-edn site-edn :output-dir output-dir :mode mode)
-                             (catch Exception e
-                               (println "Build failed:" (.getMessage e))
-                               (.printStackTrace e))))
+                           ;; Filter out changes from the output directory
+                           (when-not (.startsWith (:path event) output-path)
+                             (println (format "\nChange detected: %s" (:path event)))
+                             (try
+                               (build :site-edn site-edn :output-dir output-dir :mode mode)
+                               (catch Exception e
+                                 (println "Build failed:" (.getMessage e))
+                                 (.printStackTrace e)))))
                          10
                          :events :last)]
     (hawk/watch
