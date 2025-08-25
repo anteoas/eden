@@ -5,7 +5,8 @@
             [clojure.data.json :as json]
             [eden.site-generator :as sg]
             [eden.image-processor :as img])
-  (:import [java.lang ProcessBuilder ProcessBuilder$Redirect]))
+  (:import [java.lang ProcessBuilder ProcessBuilder$Redirect]
+           [java.io File]))
 
 (defn process-images
   "Process images in HTML and CSS files based on query parameters."
@@ -78,11 +79,11 @@
                             ;; Use esbuild if available
                             (into []
                                   (mapcat (fn [css-file]
-                                            (let [css-path (.getPath css-file)
-                                                  out-file (io/file out-dir (.getName css-file))
+                                            (let [css-path (File/.getPath css-file)
+                                                  out-file (io/file out-dir (File/.getName css-file))
                                                   args (into-array String
-                                                                   (cond-> [(.getPath esbuild-path) css-path "--bundle"
-                                                                            (str "--outfile=" (.getPath out-file))
+                                                                   (cond-> [(File/.getPath esbuild-path) css-path "--bundle"
+                                                                            (str "--outfile=" (File/.getPath out-file))
                                                                             "--metafile=/dev/stdout"
                                                                             "--external:/assets/*"
                                                                             "--loader:.css=css"
@@ -90,7 +91,7 @@
                                                                      (= mode :prod) (conj "--minify")))]
                                               (try
                                                 ;; Use ProcessBuilder to capture stdout separately
-                                                (let [pb (ProcessBuilder. args)
+                                                (let [pb (new ProcessBuilder ^"[Ljava.lang.String;" args)
                                                       _ (.redirectError pb ProcessBuilder$Redirect/DISCARD)
                                                       p (.start pb)
                                                       output (slurp (.getInputStream p))
@@ -101,27 +102,27 @@
                                                       (let [meta-data (json/read-str output :key-fn keyword)
                                                             outputs (:outputs meta-data)]
                                                         (map (fn [[out-path out-info]]
-                                                               {:file (.getName (io/file (str out-path)))
+                                                               {:file (File/.getName (io/file (str out-path)))
                                                                 :size (:bytes out-info)
                                                                 :type :css})
                                                              outputs))
                                                       ;; Fallback if no metadata
-                                                      [{:file (.getName css-file)
+                                                      [{:file (File/.getName css-file)
                                                         :size (.length out-file)
                                                         :type :css}])
                                                     (do
                                                       (println (format "    CSS %s failed with exit code %d"
-                                                                       (.getName css-file) exit-code))
+                                                                       (File/.getName css-file) exit-code))
                                                       [])))
                                                 (catch Exception e
-                                                  (println (format "    CSS %s failed: %s" (.getName css-file) (.getMessage e)))
+                                                  (println (format "    CSS %s failed: %s" (File/.getName css-file) (.getMessage e)))
                                                   []))))
                                           css-files))
                             ;; Otherwise just copy the files
                             (mapv (fn [css-file]
-                                    (let [out-file (io/file out-dir (.getName css-file))]
+                                    (let [out-file (io/file out-dir (File/.getName css-file))]
                                       (io/copy css-file out-file)
-                                      {:file (.getName css-file)
+                                      {:file (File/.getName css-file)
                                        :size (.length out-file)
                                        :type :css}))
                                   css-files))]
@@ -146,11 +147,11 @@
                             ;; Use esbuild if available
                             (into []
                                   (mapcat (fn [js-file]
-                                            (let [js-path (.getPath js-file)
-                                                  out-file (io/file out-dir (.getName js-file))
+                                            (let [js-path (File/.getPath js-file)
+                                                  out-file (io/file out-dir (File/.getName js-file))
                                                   args (into-array String
-                                                                   (cond-> [(.getPath esbuild-path) js-path "--bundle"
-                                                                            (str "--outfile=" (.getPath out-file))
+                                                                   (cond-> [(File/.getPath esbuild-path) js-path "--bundle"
+                                                                            (str "--outfile=" (File/.getPath out-file))
                                                                             "--metafile=/dev/stdout"
                                                                             "--format=iife"
                                                                             "--log-level=error"]
@@ -158,7 +159,7 @@
                                                                      (= mode :prod) (conj "--minify")))]
                                               (try
                                                 ;; Use ProcessBuilder to capture stdout separately
-                                                (let [pb (ProcessBuilder. args)
+                                                (let [pb (new ProcessBuilder ^"[Ljava.lang.String;" args)
                                                       _ (.redirectError pb ProcessBuilder$Redirect/DISCARD)
                                                       p (.start pb)
                                                       output (slurp (.getInputStream p))
@@ -169,27 +170,27 @@
                                                       (let [meta-data (json/read-str output :key-fn keyword)
                                                             outputs (:outputs meta-data)]
                                                         (map (fn [[out-path out-info]]
-                                                               {:file (.getName (io/file (str out-path)))
+                                                               {:file (File/.getName (io/file (str out-path)))
                                                                 :size (:bytes out-info)
                                                                 :type :js})
                                                              outputs))
                                                       ;; Fallback if no metadata
-                                                      [{:file (.getName js-file)
+                                                      [{:file (File/.getName js-file)
                                                         :size (.length out-file)
                                                         :type :js}])
                                                     (do
                                                       (println (format "    JS %s failed with exit code %d"
-                                                                       (.getName js-file) exit-code))
+                                                                       (File/.getName js-file) exit-code))
                                                       [])))
                                                 (catch Exception e
-                                                  (println (format "    JS %s failed: %s" (.getName js-file) (.getMessage e)))
+                                                  (println (format "    JS %s failed: %s" (File/.getName js-file) (.getMessage e)))
                                                   []))))
                                           js-files))
                             ;; Otherwise just copy the files
                             (mapv (fn [js-file]
-                                    (let [out-file (io/file out-dir (.getName js-file))]
+                                    (let [out-file (io/file out-dir (File/.getName js-file))]
                                       (io/copy js-file out-file)
-                                      {:file (.getName js-file)
+                                      {:file (File/.getName js-file)
                                        :size (.length out-file)
                                        :type :js}))
                                   js-files))]
