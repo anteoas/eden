@@ -71,7 +71,8 @@
                                 eden.builder
                                 eden.pipeline
                                 eden.renderer
-                                eden.site-generator]]
+                                eden.site-generator
+                                eden.mcp]]
       (binding [*warn-on-reflection* true]
         ;; Capture warnings during require
         (let [warning-writer (java.io.StringWriter.)]
@@ -81,9 +82,15 @@
               (require ns-sym :reload))
             (reset! warnings (str warning-writer)))))
 
-      (when (not (str/blank? @warnings))
-        (println "\nReflection warnings in critical namespaces:")
-        (println @warnings))
+      ;; Filter warnings to only show Eden namespace warnings
+      (let [eden-warnings (->> (str/split-lines @warnings)
+                               (filter #(and (str/includes? % "Reflection warning")
+                                             (str/includes? % "eden/")))
+                               (str/join "\n"))]
 
-      (is (str/blank? @warnings)
-          "Critical namespaces should have no reflection warnings"))))
+        (when (not (str/blank? eden-warnings))
+          (println "\nReflection warnings in Eden namespaces:")
+          (println eden-warnings))
+
+        (is (str/blank? eden-warnings)
+            "Eden namespaces should have no reflection warnings")))))

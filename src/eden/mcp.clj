@@ -327,7 +327,7 @@
   "Start an embedded nREPL server on a random port"
   []
   (let [server (nrepl-server/start-server :port 0) ; Random available port
-        port (.getLocalPort (:server-socket server))]
+        port (.getLocalPort ^java.net.ServerSocket (:server-socket server))]
     (reset! nrepl-server-instance {:server server :port port})
     (println "Started embedded nREPL server on port" port)
     port))
