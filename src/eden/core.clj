@@ -1,5 +1,6 @@
 (ns eden.core
   (:require [babashka.fs :as fs]
+            [clojure.string :as str]
             [clojure.java.io :as io]
             [clojure.java.process :as process]
             [hawkeye.core :as hawk]
@@ -114,7 +115,7 @@
         debounced-build (hawk/debounce
                          (fn [event]
                            ;; Filter out changes from the output directory
-                           (when-not (.startsWith (:path event) output-path)
+                           (when-not (str/starts-with? (:path event) output-path)
                              (println (format "\nChange detected: %s" (:path event)))
                              (try
                                (build :site-edn site-edn :output-dir output-dir :mode mode)
