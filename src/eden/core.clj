@@ -8,7 +8,8 @@
             [eden.mcp :as mcp]
             [eden.loader :as loader]
             [eden.pipeline :as pipeline]
-            [eden.init :as init]))
+            [eden.init :as init])
+  (:import [java.io File]))
 
 (defn- find-available-port
   "Find an available port in the given range, or use port 0 to get any available port"
@@ -136,7 +137,7 @@
           proc (start-dev-server output-path)]
       (println "Dev server running. Press Ctrl+C to stop.")
       (try
-        (.waitFor ^Process proc)
+        (Process/.waitFor proc)
         (finally
           (stop-watch)
           (println "Stopped file watcher."))))))
@@ -190,20 +191,14 @@
     (doseq [dir dirs-to-clean]
       (when (.exists ^java.io.File dir)
         (fs/delete-tree dir)
-        (println "✓ Cleaned" (.getPath ^java.io.File dir))))
+        (println "✓ Cleaned" (File/.getPath dir))))
     (println "Clean complete!")))
 
 (defn init
   "Initialize a new Eden site in the current directory.
    Delegates to eden.init/create-site for the actual implementation."
-  [_] ; Accept but ignore params for tool compatibility
+  [_]
   (init/create-site))
-
-;; Removed - HTTP MCP server no longer supported
-;; Use mcp-stdio for Claude Desktop integration
-
-;; Removed - HTTP MCP server no longer supported
-;; Use mcp-stdio for Claude Desktop integration
 
 (defn mcp-stdio
   "Start MCP server in stdio mode (for Claude Desktop)"
