@@ -8,6 +8,23 @@ You are testing the Eden MCP server implementation while also performing real si
 1. Build and develop Eden sites effectively
 2. Identify MCP server issues and suggest improvements
 
+## Quick Start
+
+First, load the Eden namespaces:
+```clojure
+(require '[eden.core :as eden])
+(require '[eden.loader :as loader])
+(require '[babashka.fs :as fs])
+(require '[clojure.edn :as edn])
+```
+
+Then you can use:
+```clojure
+(eden/build)    ; Build site (dev mode by default)
+(eden/serve)    ; Serve dist/ with browser auto-reload
+(eden/clean)    ; Clean build artifacts
+```
+
 ## Important Notes
 
 - **Eden MCP is self-contained**: Everything needed for site development should be accessible via MCP tools

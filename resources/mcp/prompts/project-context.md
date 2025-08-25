@@ -8,12 +8,19 @@ You are developing a site using Eden, a Clojure-based static site generator.
 
 ## Quick Start
 
-When you connect, Eden namespaces are auto-loaded. You'll see:
+First, load the Eden namespaces:
+```clojure
+(require '[eden.core :as eden])
+(require '[eden.loader :as loader])
+(require '[babashka.fs :as fs])
+(require '[clojure.edn :as edn])
 ```
-Eden REPL ready. Common commands:
-  (eden/build)    - Build site (dev mode by default)
-  (eden/serve)    - Serve dist/ with browser auto-reload
-  (eden/clean)    - Clean build artifacts
+
+Then you can use these commands:
+```clojure
+(eden/build)    ; Build site (dev mode by default)
+(eden/serve)    ; Serve dist/ with browser auto-reload
+(eden/clean)    ; Clean build artifacts
 ```
 
 As an AI agent, use `(eden/build)` to build the site, then `(eden/serve)` to preview it.
@@ -30,13 +37,13 @@ As an AI agent, use `(eden/build)` to build the site, then `(eden/serve)` to pre
    ;; For AI agents (you):
    (eden/build)              ; Build site (dev mode by default)
    (eden/serve)              ; Serve and preview
-   
+
    ;; For humans developing:
    (eden/watch)              ; Watch + rebuild + serve
-   
+
    ;; Production build:
    (eden/build :mode :prod)  ; Optimized build
-   
+
    ;; Clean build artifacts:
    (eden/clean)
    ```
@@ -51,7 +58,7 @@ As an AI agent, use `(eden/build)` to build the site, then `(eden/serve)` to pre
 ## Project Structure
 - `site.edn` - Main configuration
 - `content/` - Markdown files with EDN frontmatter
-- `templates/` - EDN template files  
+- `templates/` - EDN template files
 - `assets/` - CSS, JS, images
 - `dist/` - Build output (git-ignored)
 
@@ -59,7 +66,7 @@ As an AI agent, use `(eden/build)` to build the site, then `(eden/serve)` to pre
 
 ### Testing Template Changes
 ```clojure
-;; Load and test a template with sample data (loader is pre-loaded)
+;; Load and test a template with sample data
 (def site-data (loader/load-site-data "site.edn" "dist"))
 ;; Inspect and modify site-data as needed
 ```
@@ -69,8 +76,8 @@ As an AI agent, use `(eden/build)` to build the site, then `(eden/serve)` to pre
 ;; Run build steps individually
 (require '[eden.pipeline :as pipeline])
 (-> {:site-edn "site.edn" :output-dir "dist" :mode :dev}
-    (pipeline/run-step pipeline/load-step :load)
-    (pipeline/run-step pipeline/build-html-step :build-html))
+	(pipeline/run-step pipeline/load-step :load)
+	(pipeline/run-step pipeline/build-html-step :build-html))
 ```
 
 ### Working with Content
@@ -79,7 +86,7 @@ As an AI agent, use `(eden/build)` to build the site, then `(eden/serve)` to pre
 (require '[eden.content :as content])
 (content/parse-file "content/en/home.md")
 
-;; List all content files (fs is pre-loaded)
+;; List all content files
 (fs/glob "content" "**/*.{md,edn}")
 ```
 
@@ -91,7 +98,7 @@ As an AI agent, use `(eden/build)` to build the site, then `(eden/serve)` to pre
 
 ## Documentation
 - Template directives: Use `read-resource` tool with "template-directives"
-- Content structure: Use `read-resource` tool with "content-structure"  
+- Content structure: Use `read-resource` tool with "content-structure"
 - Site config: Use `read-resource` tool with "site-config"
 
 ## What is Eden?
