@@ -62,6 +62,16 @@ As an AI agent, use `(eden/build)` to build the site, then `(eden/serve)` to pre
 - `assets/` - CSS, JS, images
 - `dist/` - Build output (git-ignored)
 
+## Eden File Format Conventions
+- Use `.md` files with EDN frontmatter for content pages (blog posts, about, etc.)
+- Use `.edn` files only for data-centric content or special configuration
+- Example: `about.md` with frontmatter, not `about.edn` with `:content` key
+
+## Optimize user experience
+- Start a webserver watching the output `(eden/serve)`.
+- Notify the user what port the server is running on.
+- Call `(eden/build)` often to rebuild the site so the user can track progress.
+
 ## Common Patterns
 
 ### Testing Template Changes
