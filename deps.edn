@@ -32,9 +32,8 @@
                :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
 
  :aliases {;; Eden framework development
-           :dev:eden-framework
-           {:extra-paths ["dev"]
-            :extra-deps {djblue/portal #_{:clj-kondo/ignore [:deps.edn]} {:mvn/version "RELEASE"}}}
+           :dev {:extra-paths ["dev"]
+                 :extra-deps {djblue/portal #_{:clj-kondo/ignore [:deps.edn]} {:mvn/version "RELEASE"}}}
            :test {:extra-paths ["test"]
                   :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
                   :main-opts ["-m" "kaocha.runner"]}

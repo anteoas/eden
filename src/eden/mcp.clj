@@ -56,16 +56,12 @@
 
 (defn make-eden-prompts
   "Create Eden-specific prompts by loading from resources"
-  [nrepl-client-atom working-dir]
-  (concat
-   ;; Include standard clojure-mcp prompts
-   (mcp-main/make-prompts nrepl-client-atom working-dir)
-   ;; Add Eden-specific prompts from resources
-   (filter some?
-           [(load-mcp-prompt "project-context")
-            (load-mcp-prompt "create-page")
-            (load-mcp-prompt "mcp-tester")
-            (load-mcp-prompt "debug-build")])))
+  [_nrepl-client-atom _working-dir]
+  (filter some?
+          [(load-mcp-prompt "project-context")
+           (load-mcp-prompt "create-page")
+           (load-mcp-prompt "mcp-tester")
+           (load-mcp-prompt "debug-build")]))
 
 (defn make-eden-resources
   "Create Eden-specific resources including documentation"
@@ -74,8 +70,7 @@
   (let [default-resources (mcp-main/make-resources nrepl-client-atom working-dir)
         ;; Filter to only include relevant ones for Eden projects
         filtered-resources (filter #(contains? #{"README.md"
-                                                 "CLAUDE.md"
-                                                 "Clojure Project Info"}
+                                                 "CLAUDE.md"}
                                                (:name %))
                                    default-resources)]
     (concat
@@ -107,7 +102,7 @@
 (defn start-embedded-nrepl!
   "Start an embedded nREPL server on a random port"
   []
-  (let [server (nrepl-server/start-server :port 0) ; Random available port
+  (let [server (nrepl-server/start-server :port 0)
         port (.getLocalPort ^java.net.ServerSocket (:server-socket server))]
     (reset! nrepl-server-instance {:server server :port port})
     (println "Started embedded nREPL server on port" port)
@@ -172,3 +167,10 @@
 
 ;; -main function removed - MCP server is started via eden.core/mcp-stdio
 ;; Shutdown handling should be done by the calling code if needed
+
+(comment
+
+  (def server (start-stdio-server "site/site.edn"))
+  (tap> @mcp-core/nrepl-client-atom)
+
+)
