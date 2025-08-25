@@ -86,32 +86,3 @@
         default-lang (or (some (fn [[code cfg]] (when (:default cfg) code)) lang-config)
                          (first (keys lang-config)))]
     default-lang))
-
-(defn parse-args
-  "Parse command line arguments"
-  [args]
-  (loop [args args
-         result {}]
-    (if (empty? args)
-      ;; If serve is set but mode isn't, default to dev
-      (if (and (:serve result) (not (:mode result)))
-        (assoc result :mode :dev)
-        result)
-      (let [arg (first args)]
-        (cond
-          (= arg "--output-dir")
-          (recur (drop 2 args) (assoc result :output-dir (second args)))
-
-          (= arg "--mode")
-          (recur (drop 2 args) (assoc result :mode (keyword (second args))))
-
-          (= arg "--serve")
-          (recur (rest args) (assoc result :serve true))
-
-          (not (.startsWith arg "--"))
-          (recur (rest args) (assoc result :site-edn arg))
-
-          :else
-          (do
-            (println "Unknown option:" arg)
-            (recur (rest args) result)))))))

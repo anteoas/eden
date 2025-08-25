@@ -3,7 +3,6 @@
             [clojure.java.io :as io]
             [clojure.java.process :as process]
             [hawkeye.core :as hawk]
-            [eden.config :as config]
             [eden.report :as report]
             [eden.mcp :as mcp]
             [eden.loader :as loader]
@@ -218,41 +217,7 @@
   (println "  clj -Teden mcp-stdio                      - Run as stdio server")
   (println "  clj -M:mcp                                 - Alternative using alias"))
 
-(defn -main
-  "CLI entry point for site generator.
-   Usage: clojure -M:run path/to/site.edn [options]
-   Options:
-     --output-dir PATH  Output directory (default: dist)
-     --mode MODE        Build mode: dev or prod (default: prod)
-     --serve            Start dev server after build
-     --clean            Clean build artifacts"
-  [& args]
-  (let [parsed (config/parse-args args)]
-    (cond
-      ;; Clean command
-      (some #{"--clean"} args)
-      (clean :site-edn (:site-edn parsed)
-             :output-dir (:output-dir parsed))
 
-      ;; Build/serve commands
-      (:site-edn parsed)
-      (if (:serve parsed)
-        (dev :site-edn (:site-edn parsed)
-             :output-dir (:output-dir parsed))
-        (build :site-edn (:site-edn parsed)
-               :output-dir (:output-dir parsed)
-               :mode (or (:mode parsed) :prod)))
-
-      ;; No site-edn provided
-      :else
-      (do
-        (println "Usage: clojure -M:run path/to/site.edn [options]")
-        (println "Options:")
-        (println "  --output-dir PATH  Output directory (default: dist)")
-        (println "  --mode MODE        Build mode: dev or prod (default: prod)")
-        (println "  --serve            Start dev server after build (implies --mode dev)")
-        (println "  --clean            Clean build artifacts")
-        (System/exit 1)))))
 
 (comment
   ;; Start watching
@@ -262,5 +227,4 @@
   (stop)
 
   (clean nil)
-  (build :site-edn "site/site.edn" :mode :dev)
-  (dev :site-edn "site/site.edn"))
+  (build :site-edn "site/site.edn" :mode :dev))
