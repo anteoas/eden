@@ -169,15 +169,5 @@
         (stop-embedded-nrepl!)
         (throw e)))))
 
-(defn -main
-  "Main entry point for the integrated server"
-  [& args]
-  (let [site-edn (or (first args) "site.edn")]
-    (start-stdio-server site-edn)))
-
-;; Shutdown hook to clean up
-(.addShutdownHook (Runtime/getRuntime)
-                  (Thread. #(do
-                              (println "\nShutting down...")
-                              (stop-embedded-nrepl!)
-                              (mcp-core/close-servers nrepl-server-instance))))
+;; -main function removed - MCP server is started via eden.core/mcp-stdio
+;; Shutdown handling should be done by the calling code if needed
