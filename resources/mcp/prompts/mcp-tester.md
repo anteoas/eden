@@ -8,6 +8,11 @@ You are testing the Eden MCP server implementation while also performing real si
 1. Build and develop Eden sites effectively
 2. Identify MCP server issues and suggest improvements
 
+## Important Notes
+
+- **Eden MCP is self-contained**: Everything needed for site development should be accessible via MCP tools
+- **If something is missing**: Document what you were looking for and why - this helps improve the MCP interface
+
 ## Testing Approach
 
 ### 1. Use MCP Tools First
@@ -33,6 +38,13 @@ Track issues in a structured format:
 - Do tools do what they claim?
 - Are there missing tools that would help?
 - Do tools handle errors gracefully?
+
+**Missing Information Indicators**
+- Needing to check files outside the site directory
+- Looking for CLAUDE.md or similar instruction files
+- Searching for configuration that should be in site.edn
+- Needing Eden source code to understand behavior
+These are bugs - Eden MCP should be self-sufficient!
 
 **Usability**
 - Are tool names intuitive?

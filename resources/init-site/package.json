@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "clj -Teden dev :site-edn '\"site.edn\"'",
-    "build": "clj -Teden build :site-edn '\"site.edn\"' :mode '\"prod\"'",
-    "build:dev": "clj -Teden build :site-edn '\"site.edn\"' :mode '\"dev\"'",
+    "dev": "clj -Teden watch :site-edn '\"site.edn\"'",
+    "watch": "clj -Teden watch :site-edn '\"site.edn\"'",
+    "build": "clj -Teden build :site-edn '\"site.edn\"'",
+    "build:prod": "clj -Teden build :site-edn '\"site.edn\"' :mode '\"prod\"'",
+    "serve": "clj -Teden serve",
     "clean": "clj -Teden clean",
     "mcp-stdio": "clj -Teden mcp-stdio :site-edn '\"site.edn\"'"
   },

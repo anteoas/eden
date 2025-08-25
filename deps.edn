@@ -32,7 +32,7 @@
                :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
 
  :aliases {;; Eden framework development
-           :dev:eden-framework 
+           :dev:eden-framework
            {:extra-paths ["dev"]
             :extra-deps {djblue/portal #_{:clj-kondo/ignore [:deps.edn]} {:mvn/version "RELEASE"}}}
            :test {:extra-paths ["test"]
@@ -45,9 +45,12 @@
            ;; Tool usage
            :build {:exec-fn eden.core/build
                    :exec-args {:site-edn "site/site.edn"}}
-           :dev {:exec-fn eden.core/dev
-                 :exec-args {:site-edn "site/site.edn"}
-                 :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
+           :watch {:exec-fn eden.core/watch
+                   :exec-args {:site-edn "site/site.edn"}
+                   :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
+           :serve {:exec-fn eden.core/serve
+                   :exec-args {:output-dir "dist"}
+                   :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
            :clean {:exec-fn eden.core/clean}
            :mcp {:exec-fn eden.mcp/start-stdio-server
                  :exec-args {}

@@ -53,7 +53,7 @@
 
 (defn build
   "Build the site. Suitable for clj -X invocation."
-  [& {:keys [site-edn output-dir mode] :or {site-edn "site.edn" mode :prod}}]
+  [& {:keys [site-edn output-dir mode] :or {site-edn "site.edn" mode :dev}}]
   (println "Building site from:" site-edn)
 
   ;; Compute the actual output path like loader does
@@ -129,10 +129,9 @@
      (fn [e _ctx]
        (println "Watch error:" (.getMessage ^Exception e))))))
 
-(defn dev
-  "Start development server for your Eden site with hot-reload.
-   Watches source files for changes and automatically rebuilds.
-   Example: clj -X:dev :site-edn '\"site.edn\"'"
+(defn watch
+  "Watch source files and rebuild on changes. Starts dev server with hot-reload.
+   Example: clj -X:watch :site-edn '\"site.edn\"'"
   [& {:keys [site-edn output-dir] :or {site-edn "site.edn" output-dir "dist"}}]
   ;; Initial build
   (build :site-edn site-edn :output-dir output-dir :mode :dev)
@@ -151,6 +150,35 @@
         (finally
           (stop-watch)
           (println "Stopped file watcher."))))))
+
+(defn serve
+  "Serve the built site with browser auto-reload. For previewing changes.
+   Watches the output directory and reloads browser when files change.
+   Example: clj -X:serve :output-dir '\"dist\"'"
+  [& {:keys [output-dir] :or {output-dir "dist"}}]
+  (let [output-path (.getCanonicalPath (io/file output-dir))]
+    (when-not (fs/exists? output-path)
+      (println (str "Warning: Output directory " output-dir " does not exist."))
+      (println "Run (eden/build) first to generate the site."))
+
+    (let [port (find-available-port 3000 4000)
+          proc (process/start
+                {:out :inherit
+                 :err :inherit
+                 :dir "."}
+                "npx" "browser-sync" "start"
+                "--server" output-path
+                "--files" (str output-path "/**/*")
+                "--port" (str port)
+                "--no-notify"
+                "--open" "false")]
+      (println (str "Serving site at http://localhost:" port))
+      (println (str "Browser will reload when files change in " output-dir))
+      (println "Press Ctrl+C to stop.")
+      (try
+        (.waitFor ^Process proc)
+        (finally
+          (println "Server stopped."))))))
 
 (defn clean
   "Clean build artifacts. Suitable for clj -T or -X invocation."
@@ -199,19 +227,22 @@
   (println)
   (println "Commands:")
   (println "  clj -Teden init         - Initialize a new Eden site")
-  (println "  clj -Teden dev          - Start development server with hot-reload")
-  (println "  clj -Teden build        - Build your site (production mode)")
+  (println "  clj -Teden build        - Build your site (dev mode by default)")
+  (println "  clj -Teden watch        - Watch files and rebuild on changes")
+  (println "  clj -Teden serve        - Serve dist/ with browser auto-reload")
   (println "  clj -Teden clean        - Clean build artifacts")
   (println "  clj -Teden mcp-stdio    - Start MCP server for AI assistants")
   (println "  clj -Teden help         - Show this help message")
   (println)
   (println "Common options:")
   (println "  :site-edn '\"path\"'     - Path to site.edn (default: \"site.edn\")")
+  (println "  :output-dir '\"path\"'   - Output directory (default: \"dist\")")
   (println "  :mode '\"dev/prod\"'     - Build mode (build command only)")
   (println)
   (println "Examples:")
-  (println "  clj -Teden build :site-edn '\"site.edn\"' :mode '\"prod\"'")
-  (println "  clj -Teden dev :site-edn '\"mysite/site.edn\"'")
+  (println "  clj -Teden build :mode '\"prod\"'           - Production build")
+  (println "  clj -Teden watch :site-edn '\"mysite/site.edn\"'  - Watch with custom config")
+  (println "  clj -Teden serve :output-dir '\"public\"'   - Serve from custom directory")
   (println)
   (println "MCP stdio mode (for AI assistants):")
   (println "  clj -Teden mcp-stdio                      - Run as stdio server")

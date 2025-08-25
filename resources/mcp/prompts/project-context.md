@@ -6,6 +6,18 @@
 
 You are developing a site using Eden, a Clojure-based static site generator.
 
+## Quick Start
+
+When you connect, Eden namespaces are auto-loaded. You'll see:
+```
+Eden REPL ready. Common commands:
+  (eden/build)    - Build site (dev mode by default)
+  (eden/serve)    - Serve dist/ with browser auto-reload
+  (eden/clean)    - Clean build artifacts
+```
+
+As an AI agent, use `(eden/build)` to build the site, then `(eden/serve)` to preview it.
+
 ## Core Principles
 
 1. **REPL-First Development**
@@ -15,14 +27,18 @@ You are developing a site using Eden, a Clojure-based static site generator.
 
 2. **Eden Workflow**
    ```clojure
-   ;; Start development server (hot-reload enabled)
-   (eden.core/dev :site-edn "site.edn")
+   ;; For AI agents (you):
+   (eden/build)              ; Build site (dev mode by default)
+   (eden/serve)              ; Serve and preview
    
-   ;; Build for production
-   (eden.core/build :site-edn "site.edn" :mode :prod)
+   ;; For humans developing:
+   (eden/watch)              ; Watch + rebuild + serve
    
-   ;; Clean build artifacts
-   (eden.core/clean)
+   ;; Production build:
+   (eden/build :mode :prod)  ; Optimized build
+   
+   ;; Clean build artifacts:
+   (eden/clean)
    ```
 
 3. **REPL Development Tips**
@@ -43,8 +59,7 @@ You are developing a site using Eden, a Clojure-based static site generator.
 
 ### Testing Template Changes
 ```clojure
-;; Load and test a template with sample data
-(require '[eden.loader :as loader] :reload)
+;; Load and test a template with sample data (loader is pre-loaded)
 (def site-data (loader/load-site-data "site.edn" "dist"))
 ;; Inspect and modify site-data as needed
 ```
@@ -64,8 +79,7 @@ You are developing a site using Eden, a Clojure-based static site generator.
 (require '[eden.content :as content])
 (content/parse-file "content/en/home.md")
 
-;; List all content files
-(require '[babashka.fs :as fs])
+;; List all content files (fs is pre-loaded)
 (fs/glob "content" "**/*.{md,edn}")
 ```
 
