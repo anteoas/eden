@@ -145,7 +145,8 @@
   "Serve the built site with browser auto-reload. For previewing changes.
    Watches the output directory and reloads browser when files change.
    Example: clj -X:serve :output-dir '\"dist\"'"
-  [& {:keys [output-dir] :or {output-dir "dist"}}]
+  [& {:keys [output-dir block?] :or {output-dir "dist"
+                                     block? false}}]
   (let [output-path (.getCanonicalPath (io/file output-dir))]
     (when-not (fs/exists? output-path)
       (println (str "Warning: Output directory " output-dir " does not exist."))
@@ -164,11 +165,13 @@
                 "--open" "false")]
       (println (str "Serving site at http://localhost:" port))
       (println (str "Browser will reload when files change in " output-dir))
-      (println "Press Ctrl+C to stop.")
-      (try
-        (.waitFor ^Process proc)
-        (finally
-          (println "Server stopped."))))))
+      (if block?
+        (try
+          (println "Press Ctrl+C to stop.")
+          (Process/.waitFor proc)
+          (finally
+            (println "Server stopped.")))
+        proc))))
 
 (defn clean
   "Clean build artifacts. Suitable for clj -T or -X invocation."

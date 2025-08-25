@@ -7,7 +7,7 @@
     "watch": "clj -Teden watch :site-edn '\"site.edn\"'",
     "build": "clj -Teden build :site-edn '\"site.edn\"'",
     "build:prod": "clj -Teden build :site-edn '\"site.edn\"' :mode '\"prod\"'",
-    "serve": "clj -Teden serve",
+    "serve": "clj -Teden serve :block? true",
     "clean": "clj -Teden clean",
     "mcp-stdio": "clj -Teden mcp-stdio :site-edn '\"site.edn\"'"
   },
