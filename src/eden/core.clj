@@ -131,8 +131,9 @@
        (println "Watch error:" (.getMessage ^Exception e))))))
 
 (defn dev
-  "Build and start dev server with file watching. Suitable for clj -X invocation.
-   Example: clj -X eden.core/dev :site-edn '\"site/site.edn\"'"
+  "Start development server for your Eden site with hot-reload.
+   Watches source files for changes and automatically rebuilds.
+   Example: clj -X:dev :site-edn '\"site.edn\"'"
   [& {:keys [site-edn output-dir] :or {site-edn "site.edn" output-dir "dist"}}]
   ;; Initial build
   (build :site-edn site-edn :output-dir output-dir :mode :dev)
@@ -197,12 +198,12 @@
   [_]
   (println "Eden - Static Site Generator")
   (println)
-  (println "Available commands:")
-  (println "  clj -Teden init         - Initialize a new Eden site in current directory")
-  (println "  clj -Teden build        - Build the site (production mode)")
-  (println "  clj -Teden dev          - Start development server with file watching")
+  (println "Commands:")
+  (println "  clj -Teden init         - Initialize a new Eden site")
+  (println "  clj -Teden dev          - Start development server with hot-reload")
+  (println "  clj -Teden build        - Build your site (production mode)")
   (println "  clj -Teden clean        - Clean build artifacts")
-  (println "  clj -Teden mcp-stdio    - Start MCP server in stdio mode (for Claude Desktop)")
+  (println "  clj -Teden mcp-stdio    - Start MCP server for AI assistants")
   (println "  clj -Teden help         - Show this help message")
   (println)
   (println "Common options:")
@@ -213,7 +214,7 @@
   (println "  clj -Teden build :site-edn '\"site.edn\"' :mode '\"prod\"'")
   (println "  clj -Teden dev :site-edn '\"mysite/site.edn\"'")
   (println)
-  (println "MCP stdio mode (for Claude Desktop):")
+  (println "MCP stdio mode (for AI assistants):")
   (println "  clj -Teden mcp-stdio                      - Run as stdio server")
   (println "  clj -M:mcp                                 - Alternative using alias"))
 

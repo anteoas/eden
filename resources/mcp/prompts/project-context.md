@@ -1,43 +1,91 @@
 {:name "eden_project_context"
- :description "Understand the Eden static site generator project context and common tasks"
+ :description "REPL-first development guide for Eden static site generator"
  :arguments []}
 ---
-You are working with an Eden static site generator project.
+# Eden Site Development with REPL
 
-# What is Eden?
-Eden is a Clojure-based static site generator that uses:
+You are developing a site using Eden, a Clojure-based static site generator.
+
+## Core Principles
+
+1. **REPL-First Development**
+   - Use `clojure_eval` for all Eden operations (build, dev server, etc.)
+   - Avoid Bash for site operations - the REPL has everything you need
+   - Build incrementally: test small changes in REPL before full builds
+
+2. **Eden Workflow**
+   ```clojure
+   ;; Start development server (hot-reload enabled)
+   (eden.core/dev :site-edn "site.edn")
+   
+   ;; Build for production
+   (eden.core/build :site-edn "site.edn" :mode :prod)
+   
+   ;; Clean build artifacts
+   (eden.core/clean)
+   ```
+
+3. **REPL Development Tips**
+   - Make incremental changes and test immediately
+   - Use `(require '[namespace] :reload)` to pick up file changes
+   - Build functions compose - test pipeline steps individually
+   - Keep a REPL session running for rapid iteration
+   - Test template rendering with small data samples first
+
+## Project Structure
+- `site.edn` - Main configuration
+- `content/` - Markdown files with EDN frontmatter
+- `templates/` - EDN template files  
+- `assets/` - CSS, JS, images
+- `dist/` - Build output (git-ignored)
+
+## Common Patterns
+
+### Testing Template Changes
+```clojure
+;; Load and test a template with sample data
+(require '[eden.loader :as loader] :reload)
+(def site-data (loader/load-site-data "site.edn" "dist"))
+;; Inspect and modify site-data as needed
+```
+
+### Debugging Build Issues
+```clojure
+;; Run build steps individually
+(require '[eden.pipeline :as pipeline])
+(-> {:site-edn "site.edn" :output-dir "dist" :mode :dev}
+    (pipeline/run-step pipeline/load-step :load)
+    (pipeline/run-step pipeline/build-html-step :build-html))
+```
+
+### Working with Content
+```clojure
+;; Parse a content file directly
+(require '[eden.content :as content])
+(content/parse-file "content/en/home.md")
+
+;; List all content files
+(require '[babashka.fs :as fs])
+(fs/glob "content" "**/*.{md,edn}")
+```
+
+## Important Notes
+- Eden uses EDN (not JSON/YAML) for all configuration
+- Templates use directives like `[:eden/get :var]` not `{{ var }}`
+- The dev server watches source files and rebuilds automatically
+- For MCP tools, use the eden-mcp server (already running)
+
+## Documentation
+- Template directives: Use `read-resource` tool with "template-directives"
+- Content structure: Use `read-resource` tool with "content-structure"  
+- Site config: Use `read-resource` tool with "site-config"
+
+## What is Eden?
+Eden is a static site generator that uses:
 - EDN (Extensible Data Notation) for configuration and templates
 - Markdown files with EDN frontmatter for content
-- A directive-based template system (like :eden/get, :eden/each)
+- A directive-based template system (like `:eden/get`, `:eden/each`)
 - Multi-language support
 - Automatic image processing
 
-# Common Tasks
-1. **Content Management**
-   - Create/edit markdown files in content/ directory
-   - Use EDN frontmatter (before --- separator)
-   - Organize by language (content/en/, content/es/)
-
-2. **Template Work**
-   - Templates are in templates/ directory as .edn files
-   - Use Eden directives as elements: [:eden/get :title]
-   - Create reusable components with :eden/include
-
-3. **Site Configuration**
-   - Main config in site.edn
-   - Build with: (eden.core/build :site-edn "site.edn")
-   - Dev mode: (eden.core/dev :site-edn "site.edn")
-
-4. **Development Workflow**
-   - Run from project root (where site.edn is located)
-   - Use `clj -Teden dev` for live reload
-   - Check dist/ for build output
-
-# Best Practices
-- Keep content and presentation separate
-- Use semantic template names
-- Leverage Eden directives instead of inline HTML
-- Test multi-language content if configured
-- Use image processing for optimization
-
-Always check the Eden documentation resources for detailed syntax and examples.
+Remember: The REPL is your primary interface. Build iteratively, test frequently.

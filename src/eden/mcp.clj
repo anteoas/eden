@@ -64,6 +64,7 @@
    (filter some?
            [(load-mcp-prompt "project-context")
             (load-mcp-prompt "create-page")
+            (load-mcp-prompt "mcp-tester")
             (load-mcp-prompt "debug-build")])))
 
 (defn make-eden-resources

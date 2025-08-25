@@ -31,21 +31,24 @@
                :exec-fn eden.core/help
                :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
 
- :aliases {:run {:main-opts ["-m" "eden.core"]}
-           :dev {:extra-paths ["dev"]
-                 :extra-deps {djblue/portal #_{:clj-kondo/ignore [:deps.edn]} {:mvn/version "RELEASE"}}}
-           :build {:exec-fn eden.core/build
-                   :exec-args {:site-edn "site/site.edn"}}
-           :serve {:exec-fn eden.core/dev
-                   :exec-args {:site-edn "site/site.edn"}
-                   :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
-           :clean {:exec-fn eden.core/clean}
+ :aliases {;; Eden framework development
+           :dev:eden-framework 
+           {:extra-paths ["dev"]
+            :extra-deps {djblue/portal #_{:clj-kondo/ignore [:deps.edn]} {:mvn/version "RELEASE"}}}
            :test {:extra-paths ["test"]
                   :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
                   :main-opts ["-m" "kaocha.runner"]}
            :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
                    :jvm-opts ["-Djdk.attach.allowAttachSelf"]
                    :main-opts ["-m" "nrepl.cmdline"]}
+
+           ;; Tool usage
+           :build {:exec-fn eden.core/build
+                   :exec-args {:site-edn "site/site.edn"}}
+           :dev {:exec-fn eden.core/dev
+                 :exec-args {:site-edn "site/site.edn"}
+                 :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
+           :clean {:exec-fn eden.core/clean}
            :mcp {:exec-fn eden.mcp/start-stdio-server
                  :exec-args {}
                  :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}}}
