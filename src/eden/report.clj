@@ -265,6 +265,14 @@
           (println (format "  - Page ID: %s\n    Found in: %s" page-id stack-str))
           (println (format "  - Page ID: %s" page-id))))))
 
+  ;; Print orphan content warning
+  (when-let [orphan-content (:orphan-content warnings)]
+    (when (seq orphan-content)
+      (println "\n📝 Found content files not linked from your site:")
+      (doseq [content-key (sort orphan-content)]
+        (println (format "  - content/%s.edn (or .md)" (name content-key))))
+      (println "  To include them, add links from existing pages or add to :render-roots")))
+
   ;; Print error if any
   (when error
     (println (format "\n❌ Build failed: %s" error))))

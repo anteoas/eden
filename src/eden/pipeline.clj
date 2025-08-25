@@ -1,6 +1,7 @@
 (ns eden.pipeline
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
+            [clojure.set :as set]
             [babashka.fs :as fs]
             [eden.loader :as loader]
             [eden.builder :as builder]
@@ -37,9 +38,30 @@
   "Build HTML from templates and content"
   [ctx]
   (let [site-data (get-in ctx [:results :load])
-        {:keys [html-files warnings]} (builder/build-site site-data {:verbose false})]
-    {:result {:html-files html-files}
-     :warnings warnings}))
+        {:keys [html-files warnings]} (builder/build-site site-data {:verbose false})
+
+        ;; Detect orphan content
+        all-content (into #{}
+                          (for [[_lang content-map] (:content site-data)
+                                [content-key _] content-map]
+                            content-key))
+        rendered-pages (into #{} (map :content-key html-files))
+        ;; Pages with warnings were attempted but failed
+        pages-with-warnings (into #{} (map :content-key (:page-warnings warnings)))
+        ;; Attempted = rendered + failed
+        attempted-pages (set/union rendered-pages pages-with-warnings)
+        ;; True orphans = content that was never attempted
+        orphan-content (set/difference all-content attempted-pages)
+
+        ;; Add orphan warning if any found
+        warnings-with-orphans (if (seq orphan-content)
+                                (assoc warnings :orphan-content orphan-content)
+                                warnings)]
+    {:result {:html-files html-files
+              :all-content all-content
+              :rendered-pages rendered-pages
+              :orphan-content orphan-content}
+     :warnings warnings-with-orphans}))
 
 (defn process-images-step
   "Process images if enabled"

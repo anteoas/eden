@@ -85,18 +85,7 @@
                       (pipeline/run-step pipeline/copy-processed-images-step :copy-processed-images))]
 
     (report/print-build-report final-ctx)
-
-    ;; Write HTML report in dev mode
-    (when (= mode :dev)
-      (let [report-path (io/file (:output-dir final-ctx) "_report.html")
-            report-html (report/generate-html-report final-ctx)]
-        (io/make-parents report-path)
-        (spit report-path report-html)
-        (println (format "\n📊 Build report: %s" (.getPath report-path)))))
-
-    (when (:error final-ctx)
-      (throw (ex-info "Build failed" final-ctx)))
-
+    (report/generate-html-report final-ctx)
     (println "\nBuild complete!")))
 
 (defn- start-watch
