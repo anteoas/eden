@@ -37,16 +37,18 @@
   "Start browser-sync dev server"
   [output-dir]
   (println "Starting development server...")
-  (let [proc (process/start
+  (let [port (find-available-port 3000 4000)
+        proc (process/start
               {:out :inherit ; Send output to console
                :err :inherit ; Send errors to console
                :dir "."} ; Run from current dir
               "npx" "browser-sync" "start"
               "--server" output-dir
               "--files" (str output-dir "/**/*")
+              "--port" (str port)
               "--no-notify"
               "--open" "false")]
-    (println "Dev server starting at http://localhost:3000")
+    (println (str "Dev server starting at http://localhost:" port))
     ;; Return process so it can be managed
     proc))
 
