@@ -194,176 +194,147 @@
 ;; :eden/link - Smart linking directive
 (defmethod process-element :eden/link [elem context]
   (let [[_ link-spec & body] elem
-        ;; Process the link spec in the current context to support dynamic values
-        ;; This allows [:eden/link [:eden/get :content-key] ...] to work in loops
-        ;; NOTE: Map values are NOT recursively processed, so {:content-key [:eden/get :x]}
-        ;; won't evaluate the inner :eden/get. Only simple expressions are supported.
+        ;; Process spec to support dynamic values like [:eden/get :content-key]
         processed-spec (process-element link-spec context)
-        ;; Normalize link spec
-        link-config (if (keyword? processed-spec)
-                      {:content-key processed-spec}
-                      processed-spec)
-        ;; Use current page if no content-key specified
-        page-id (or (:content-key link-config)
-                    (when (contains? link-config :lang)
-                      (last (:path context))))
-        ;; Check if requested language is configured
-        requested-lang (:lang link-config)
-        lang-configured? (or (nil? requested-lang)
-                             (get-in context [:site-config :lang requested-lang]))
-        ;; Override language if specified and configured
-        context (if (and requested-lang lang-configured?)
-                  (assoc context :lang requested-lang)
-                  context)
-        ;; Determine target and path
-        target-info (cond
-                      ;; Skip processing if language not configured
-                      (and requested-lang (not lang-configured?))
-                      (do
-                        (when-let [warn! (:warn! context)]
-                          (warn! {:type :unconfigured-language
-                                  :lang requested-lang
-                                  :content-key page-id
-                                  :location (str "Template: " (get-in context [:render-stack 0 1] "unknown"))
-                                  :message (str "Language '" (name requested-lang)
-                                                "' referenced in :eden/link but not configured in site.edn. "
-                                                "Add it to :lang configuration.")}))
-                        nil)
+        ;; Normalize to config map
+        config (if (keyword? processed-spec)
+                 {:content-key processed-spec}
+                 processed-spec)
 
-                      ;; Link by content-key - check both pages and sections
-                      page-id
-                      (let [has-page? (get-in context [:pages page-id])
-                            has-section? (get-in context [:sections page-id])
-                            current-page-id (:current-page-id context)]
-                        ;; Warn about ambiguity
-                        (when (and has-page? has-section? (:warn! context))
-                          ((:warn! context) {:type :ambiguous-link
-                                             :link-id page-id
-                                             :as-page (:slug has-page?)
-                                             :as-section (let [{:keys [parent-template section-id]} has-section?]
-                                                           (str (get-in context [:pages parent-template :slug]) "#" section-id))
-                                             :resolved-to :page
-                                             :location (get-render-stack context)}))
-                        (cond
-                          ;; Prefer standalone page
-                          has-page?
-                          {:page has-page?
-                           :content-key page-id}
+        ;; Extract config values
+        {:keys [content-key lang nav]} config
+        page-id (or content-key
+                    (when lang (last (:path context)))) ; Current page for lang switch
 
-                          ;; Check sections
-                          has-section?
-                          (let [{:keys [parent-template section-id]} has-section?]
-                            (if (= parent-template current-page-id)
-                              ;; Same page - use hash link
-                              {:section-link (str "#" section-id)}
-                              ;; Different page - link to page with hash
-                              (when-let [parent-page (get-in context [:pages parent-template])]
-                                {:page parent-page
-                                 :content-key parent-template
-                                 :section-hash section-id})))
+        ;; Language check
+        lang-valid? (or (nil? lang)
+                        (get-in context [:site-config :lang lang]))
 
-                          ;; Not found
-                          :else nil))
+        ;; Helper: process body with link context
+        process-body (fn [url title]
+                       (let [link-ctx (update context :data assoc
+                                              :link/href url
+                                              :link/title title)]
+                         (if (= 1 (count body))
+                           (process-element (first body) link-ctx)
+                           (vec (map #(process-element % link-ctx) body)))))
 
-                      ;; Navigation links
-                      (= (:nav link-config) :parent)
-                      (let [current-path (:path context)]
-                        (cond
-                          ;; No path or at root - no parent
-                          (or (nil? current-path) (empty? current-path))
-                          nil
+        ;; Helper: generate URL for page
+        make-url (fn [page section-hash]
+                   (let [target-lang (or lang (:lang context))
+                         base (if-let [page->url (:page->url context)]
+                                (page->url {:slug (:slug page)
+                                            :lang target-lang
+                                            :site-config (:site-config context)})
+                               ;; Fallback
+                                (str "/" (when (and target-lang
+                                                    (not (#{:no nil} target-lang)))
+                                           (str (name target-lang) "/"))
+                                     (:slug page)))]
+                     (if section-hash
+                       (str base "#" section-hash)
+                       base)))
 
-                          ;; One level deep - parent is root
-                          (= (count current-path) 1)
-                          (when-let [page (or (get-in context [:pages :landing])
-                                              (get-in context [:pages :home]))]
-                            {:page page
-                             :content-key :landing})
+        ;; Helper: find navigation target
+        find-nav-target (fn [nav-type]
+                          (case nav-type
+                            :parent
+                            (let [path (:path context)]
+                              (cond
+                                (or (nil? path) (empty? path)) nil
+                                (= 1 (count path))
+                                (when-let [page (or (get-in context [:pages :landing])
+                                                    (get-in context [:pages :home]))]
+                                  {:page page :content-key :landing})
+                                :else
+                                (let [parent-id (last (butlast path))]
+                                  (when-let [page (get-in context [:pages parent-id])]
+                                    {:page page :content-key parent-id}))))
 
-                          ;; Multiple levels - get parent
-                          :else
-                          (let [parent-path (vec (butlast current-path))
-                                parent-id (last parent-path)]
-                            (when-let [page (get-in context [:pages parent-id])]
-                              {:page page
-                               :content-key parent-id}))))
+                            :root
+                            (when-let [page (or (get-in context [:pages :landing])
+                                                (get-in context [:pages :home]))]
+                              {:page page :content-key :landing})
 
-                      (= (:nav link-config) :root)
-                      (when-let [page (or (get-in context [:pages :landing])
-                                          (get-in context [:pages :home]))]
-                        {:page page
-                         :content-key :landing})
+                            nil))]
 
-                      :else nil)]
-    (if target-info
-      (let [;; Handle different target types
-            [url title] (cond
-                          ;; Section on same page
-                          (:section-link target-info)
-                          [(:section-link target-info) ""]
+    ;; Handle invalid language early
+    (when (and lang (not lang-valid?))
+      (when-let [warn! (:warn! context)]
+        (warn! {:type :unconfigured-language
+                :lang lang
+                :content-key page-id
+                :location (str "Template: " (get-in context [:render-stack 0 1] "unknown"))
+                :message (str "Language '" (name lang) "' not configured in site.edn")})))
 
-                          ;; Page (possibly with section hash)
-                          (:page target-info)
-                          (let [page (:page target-info)
-                                base-url (if-let [page->url (:page->url context)]
-                                           (page->url {:slug (:slug page)
-                                                       :lang (:lang context)
-                                                       :site-config (:site-config context)})
-                                           ;; Fallback to old URL generation
-                                           (let [lang (:lang context)
-                                                 is-default-lang (or (= lang :no) (nil? lang))
-                                                 slug (:slug page)]
-                                             (if is-default-lang
-                                               (str "/" slug)
-                                               (str "/" (name lang) "/" slug))))
-                                ;; Add section hash if present
-                                final-url (if-let [section-hash (:section-hash target-info)]
-                                            (str base-url "#" section-hash)
-                                            base-url)]
-                            [final-url (:title page)])
+    (if-not lang-valid?
+      nil ; Skip rendering for invalid language
 
-                          :else
-                          ["#" ""])
-            ;; Merge link info into :data
-            link-context (update context :data assoc
-                                 :link/href url
-                                 :link/title title)]
-        ;; Process body with link context
-        (if (= (count body) 1)
-          (let [result (process-element (first body) link-context)]
-            ;; If result is a vector of elements from :eden/each, return it as-is
-            ;; to be flattened by parent context
-            result)
-          (vec (map #(process-element % link-context) body))))
-      ;; No target found or language not configured
-      (cond
-        ;; Language not configured - skip rendering
-        (and requested-lang (not lang-configured?))
-        nil
+      ;; Find target
+      (let [target (cond
+                    ;; Navigation link
+                     nav (find-nav-target nav)
 
-        ;; Parent at root returns nil
-        (and (= (:nav link-config) :parent)
-             (or (nil? (:path context)) (empty? (:path context))))
-        nil
+                    ;; Content link
+                     page-id
+                     (let [page (get-in context [:pages page-id])
+                           section (get-in context [:sections page-id])
+                           current-page (:current-page-id context)]
 
-        ;; Other cases: use placeholder
-        :else
-        (do
-          ;; Record warning if content-key was specified and warnings atom exists
-          (when (and (:warn! context) page-id)
-            ((:warn! context) {:type :missing-page
-                               :content-key page-id
-                               :render-stack (get-render-stack context)}))
-          ;; Process with placeholder values
-          (when (seq body)
-            (let [link-context (update context :data assoc
-                                       :link/href "#"
-                                       :link/title (if (keyword? processed-spec)
-                                                     (name processed-spec)
-                                                     (str processed-spec)))]
-              (if (= (count body) 1)
-                (process-element (first body) link-context)
-                (vec (map #(process-element % link-context) body))))))))))
+                      ;; Warn about ambiguity
+                       (when (and page section (:warn! context))
+                         ((:warn! context) {:type :ambiguous-link
+                                            :link-id page-id
+                                            :as-page (:slug page)
+                                            :as-section (str (get-in context [:pages (:parent-template section) :slug])
+                                                             "#" (:section-id section))
+                                            :resolved-to :page
+                                            :location (get-render-stack context)}))
+
+                       (cond
+                         page {:page page :content-key page-id}
+
+                         section
+                         (if (= (:parent-template section) current-page)
+                           {:section-link (str "#" (:section-id section))}
+                           (when-let [parent (get-in context [:pages (:parent-template section)])]
+                             {:page parent
+                              :content-key (:parent-template section)
+                              :section-hash (:section-id section)}))
+
+                         :else nil))
+
+                     :else nil)]
+
+        (cond
+          ;; Special case: nav :parent at root returns nil
+          (and (= nav :parent) (nil? target))
+          nil
+
+          ;; Normal target found
+          target
+          (let [[url title] (cond
+                              (:section-link target)
+                              [(:section-link target) ""]
+
+                              (:page target)
+                              [(make-url (:page target) (:section-hash target))
+                               (:title (:page target))]
+
+                              :else ["#" ""])]
+            (process-body url title))
+
+          ;; Handle missing target
+          :else
+          (do
+            (when (and (:warn! context) page-id)
+              ((:warn! context) {:type :missing-page
+                                 :content-key page-id
+                                 :render-stack (get-render-stack context)}))
+            (when (seq body)
+              (process-body "#" (if (keyword? processed-spec)
+                                  (name processed-spec)
+                                  (str processed-spec))))))))))
 
 ;; Method implementations
 
@@ -598,208 +569,132 @@
 
 (defmethod process-element :eden/each [elem context]
   (let [{:keys [collection-key options template]} (parse-eden-each-args (rest elem))
-        limit (:limit options)
-        order-by (:order-by options)
-        group-by (:group-by options)
-        where (:where options)
-        ;; Determine the collection source
-        collection (cond
-                     ;; Special :eden/all keyword - get all content
-                     (= :eden/all collection-key)
-                     (when-let [content-data (:content-data context)]
-                       ;; Convert content map to a vector of maps with :page-id
-                       (let [content-vec (mapv (fn [[id data]]
-                                                 (assoc data :content-key id))
-                                               content-data)]
-                         ;; Apply where filter if provided
-                         (if where
-                           (filterv (fn [item]
-                                      ;; Check all where conditions (AND logic)
-                                      (every? (fn [[k v]]
-                                                (= (get item k) v))
-                                              where))
-                                    content-vec)
-                           content-vec)))
+        {:keys [limit order-by group-by where]} options
 
-                     ;; Regular collection from :data
-                     :else
-                     (let [coll (get-in context [:data collection-key])]
-                       ;; Apply where filter if provided and collection is sequential
-                       (if (and where (sequential? coll))
-                         (filterv (fn [item]
-                                    ;; Check all where conditions (AND logic)
-                                    (every? (fn [[k v]]
-                                              (= (get item k) v))
-                                            where))
-                                  coll)
-                         coll)))]
+        ;; Common filter function
+        filter-by-where (fn [coll]
+                          (if where
+                            (filterv (fn [item]
+                                       (every? (fn [[k v]] (= (get item k) v))
+                                               where))
+                                     coll)
+                            coll))
+
+        ;; Common sort comparator builder
+        make-comparator (fn [_ dir]
+                          (let [desc? (= dir :desc)]
+                            (fn [a b]
+                              (let [result (compare a b)]
+                                (if desc? (- result) result)))))
+
+        ;; Get the collection based on source
+        raw-collection (cond
+                         (= :eden/all collection-key)
+                         (when-let [content-data (:content-data context)]
+                           (mapv (fn [[id data]]
+                                   (assoc data :content-key id))
+                                 content-data))
+
+                         :else
+                         (get-in context [:data collection-key]))
+
+        ;; Apply filter if collection is sequential
+        collection (if (sequential? raw-collection)
+                     (filter-by-where raw-collection)
+                     raw-collection)]
+
     (cond
+      ;; No collection
+      (nil? collection)
+      []
+
       ;; Handle maps
       (map? collection)
-      (let [;; Convert map to sequence of [k v] pairs
-            map-entries (seq collection)
-            ;; Sort if order-by specified
-            sorted-entries (if order-by
-                             (let [order-specs (partition 2 order-by)
-                                   comparators (map (fn [[field dir]]
-                                                      (cond
-                                                        ;; Sort by key
-                                                        (= field :eden.each/key)
-                                                        (if (= dir :desc)
-                                                          #(compare (first %2) (first %1))
-                                                          #(compare (first %1) (first %2)))
-                                                        ;; Sort by value (if map) or by :eden.each/value
-                                                        (= field :eden.each/value)
-                                                        (if (= dir :desc)
-                                                          #(compare (second %2) (second %1))
-                                                          #(compare (second %1) (second %2)))
-                                                        ;; Sort by field in value (if value is a map)
-                                                        :else
-                                                        (if (= dir :desc)
-                                                          #(compare (get (second %2) field)
-                                                                    (get (second %1) field))
-                                                          #(compare (get (second %1) field)
-                                                                    (get (second %2) field)))))
-                                                    order-specs)]
-                               (sort (fn [a b]
-                                       (loop [comps comparators]
-                                         (if (empty? comps)
-                                           0
-                                           (let [result ((first comps) a b)]
-                                             (if (zero? result)
-                                               (recur (rest comps))
-                                               result)))))
-                                     map-entries))
-                             map-entries)
-            ;; Apply limit
-            limited-entries (if limit
-                              (take limit sorted-entries)
-                              sorted-entries)]
-        ;; Process template for each entry with index
-        (vec (map-indexed (fn [idx [k v]]
-                            (let [;; Build context based on value type
-                                  item-context (cond
-                                                 ;; If value is a map, merge it into :data
-                                                 (map? v)
-                                                 (update context :data merge
-                                                         v
-                                                         {:eden.each/key k
-                                                          :eden.each/index idx})
-                                                 ;; Otherwise, add as minimal fields
-                                                 :else
-                                                 (update context :data merge
-                                                         {:eden.each/key k
-                                                          :eden.each/value v
-                                                          :eden.each/index idx}))]
-                              (process-element template item-context)))
-                          limited-entries)))
+      (let [entries (seq collection)
+            sorted (if order-by
+                     (let [order-specs (partition 2 order-by)]
+                       (sort (fn [[k1 v1] [k2 v2]]
+                               (loop [specs order-specs]
+                                 (if-let [[field dir] (first specs)]
+                                   (let [cmp (make-comparator field dir)
+                                         result (case field
+                                                  :eden.each/key (cmp k1 k2)
+                                                  :eden.each/value (cmp v1 v2)
+                                                  (cmp (get v1 field) (get v2 field)))]
+                                     (if (zero? result)
+                                       (recur (rest specs))
+                                       result))
+                                   0)))
+                             entries))
+                     entries)]
+        (vec (map-indexed
+              (fn [idx [k v]]
+                (process-element template
+                                 (update context :data merge
+                                         (if (map? v) v {})
+                                         {:eden.each/key k
+                                          :eden.each/value (when-not (map? v) v)
+                                          :eden.each/index idx})))
+              (cond->> sorted
+                limit (take limit)))))
 
-      ;; Handle sequences (existing logic with index added)
+      ;; Handle sequences with grouping
+      (and (sequential? collection) group-by)
+      (let [group-path (if (vector? group-by) group-by [group-by])
+            groups (clojure.core/group-by #(get-in % group-path) collection)
+            group-pairs (vec groups)
+            sorted (if (and order-by (some #(= % :eden.each/group-key) order-by))
+                     (let [order-specs (partition 2 order-by)]
+                       (sort (fn [[k1 _] [k2 _]]
+                               (loop [specs order-specs]
+                                 (if-let [[field dir] (first specs)]
+                                   (if (= field :eden.each/group-key)
+                                     (let [cmp (make-comparator field dir)]
+                                       (cmp k1 k2))
+                                     (recur (rest specs)))
+                                   0)))
+                             group-pairs))
+                     group-pairs)]
+        (vec (mapcat
+              (fn [[idx [group-key items]]]
+                (let [indexed-items (map-indexed #(assoc %2 :eden.each/index %1) items)
+                      result (process-element template
+                                              (update context :data merge
+                                                      (first items)
+                                                      {:eden.each/group-key group-key
+                                                       :eden.each/group-items indexed-items
+                                                       :eden.each/index idx}))]
+                  (if (and (vector? result) (not (keyword? (first result))))
+                    result
+                    [result])))
+              (map-indexed vector (cond->> sorted
+                                    limit (take limit))))))
+
+      ;; Handle regular sequences  
       (sequential? collection)
-      (if group-by
-        ;; Group-by mode
-        (let [;; Apply where filter before grouping if provided
-              filtered-coll (if where
-                              (filterv (fn [item]
-                                         ;; Check all where conditions (AND logic)
-                                         (every? (fn [[k v]]
-                                                   (= (get item k) v))
-                                                 where))
-                                       collection)
-                              collection)
-              ;; Group items by the specified field
-              group-path (if (vector? group-by) group-by [group-by])
-              grouped (clojure.core/group-by #(get-in % group-path) filtered-coll)
-              ;; Convert to vector of [group-key items] pairs to maintain order
-              group-pairs (vec grouped)
-              ;; Sort groups if order-by specified with :eden.each/group-key
-              sorted-groups (if (and order-by
-                                     (some #(= % :eden.each/group-key) order-by))
-                              (let [order-specs (partition 2 order-by)
-                                    comparators (map (fn [[field dir]]
-                                                       (if (= field :eden.each/group-key)
-                                                         (if (= dir :desc)
-                                                           #(compare (first %2) (first %1))
-                                                           #(compare (first %1) (first %2)))
-                                                         (constantly 0)))
-                                                     order-specs)]
-                                (sort (fn [a b]
-                                        (loop [comps comparators]
-                                          (if (empty? comps)
-                                            0
-                                            (let [result ((first comps) a b)]
-                                              (if (zero? result)
-                                                (recur (rest comps))
-                                                result)))))
-                                      group-pairs))
-                              group-pairs)
-              ;; Apply limit to groups if specified
-              limited-groups (if limit
-                               (take limit sorted-groups)
-                               sorted-groups)]
-          ;; Process template for each group with index
-          (vec (mapcat (fn [[idx [group-key items]]]
-                         (let [;; Add items with their own indices for nested :eden/each
-                               indexed-items (vec (map-indexed (fn [item-idx item]
-                                                                 (assoc item :eden.each/index item-idx))
-                                                               items))
-                               ;; Merge first item plus group metadata into :data
-                               group-context (update context :data merge
-                                                     (first items)
-                                                     {:eden.each/group-key group-key
-                                                      :eden.each/group-items indexed-items
-                                                      :eden.each/index idx})
-                               ;; Process template returns a single element per group
-                               ;; but we need to ensure it's wrapped properly for mapcat
-                               result (process-element template group-context)]
-                           (if (and (vector? result)
-                                    (not (keyword? (first result))))
-                             result ; It's already a vector of elements
-                             [result]))) ; Wrap single element
-                       (map-indexed vector limited-groups))))
-        ;; Regular mode (no grouping) - with index
-        (let [;; Apply where filter if provided
-              filtered-coll (if where
-                              (filterv (fn [item]
-                                         ;; Check all where conditions (AND logic)
-                                         (every? (fn [[k v]]
-                                                   (= (get item k) v))
-                                                 where))
-                                       collection)
-                              collection)
-              sorted-coll (if order-by
-                            (let [order-specs (partition 2 order-by)
-                                  comparators (map (fn [[field dir]]
-                                                     (if (= dir :desc)
-                                                       #(compare (get %2 field) (get %1 field))
-                                                       #(compare (get %1 field) (get %2 field))))
-                                                   order-specs)]
-                              (sort (fn [a b]
-                                      (loop [comps comparators]
-                                        (if (empty? comps)
-                                          0
-                                          (let [result ((first comps) a b)]
-                                            (if (zero? result)
-                                              (recur (rest comps))
-                                              result)))))
-                                    filtered-coll))
-                            filtered-coll)
-              limited-coll (if limit
-                             (take limit sorted-coll)
-                             sorted-coll)]
-          ;; Add index to each item
-          (vec (map-indexed (fn [idx item]
-                              (let [item-context (if (map? item)
-                                                   (update context :data merge
-                                                           item
-                                                           {:eden.each/index idx})
-                                                   (update context :data merge
-                                                           {:eden.each/value item
-                                                            :eden.each/index idx}))]
-                                (process-element template item-context)))
-                            limited-coll))))
+      (let [sorted (if order-by
+                     (let [order-specs (partition 2 order-by)]
+                       (sort (fn [a b]
+                               (loop [specs order-specs]
+                                 (if-let [[field dir] (first specs)]
+                                   (let [cmp (make-comparator field dir)
+                                         result (cmp (get a field) (get b field))]
+                                     (if (zero? result)
+                                       (recur (rest specs))
+                                       result))
+                                   0)))
+                             collection))
+                     collection)]
+        (vec (map-indexed
+              (fn [idx item]
+                (process-element template
+                                 (update context :data merge
+                                         (if (map? item) item {:eden.each/value item})
+                                         {:eden.each/index idx})))
+              (cond->> sorted
+                limit (take limit)))))
 
-      ;; No collection
+      ;; Fallback
       :else
       [])))
 
