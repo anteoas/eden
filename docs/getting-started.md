@@ -56,7 +56,7 @@ The `site.edn` file is your site's configuration:
 Key settings:
 - **`:wrapper`** - The template that wraps all pages (provides `<html>`, `<head>`, etc.)
 - **`:index`** - The template used for your homepage
-- **`:render-roots`** - Starting points for rendering (Eden follows links to find all pages)
+- **`:render-roots`** - Starting points for rendering (Eden follows links to find all pages). Usually just `#{:home}` - multiple roots only needed for disconnected pages (email campaigns, landing pages)
 - **`:lang`** - Language configuration (add more for multilingual sites)
 - **`:url-strategy`** - How URLs are generated (`:flat` for `/page.html` or `:nested` for `/page/index.html`)
 
@@ -71,6 +71,8 @@ Content files can be either EDN or Markdown:
  :template :page
  :content/html "<p>Welcome to our company...</p>"}
 ```
+
+Note: Markdown content is automatically converted to HTML and stored under `:content/html`. You can add this manually in EDN files but markdown is preferred for prose content.
 
 #### Markdown Content (content/en/blog-post.md):
 ```markdown

@@ -28,7 +28,7 @@
 
  ;; Enable image processing and optimization (default: false)
  ;; When true, images referenced in HTML/CSS are automatically optimized
- ;; :image-processor false
+ :image-processor true
 
  ;; Directory paths (relative to site.edn location)
  ;; :templates "templates"  ; Where template files are stored (default)

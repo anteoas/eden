@@ -7,24 +7,45 @@
 
 Eden templates use EDN-based directives as elements for dynamic content generation.
 
-## Core Directives
+## Data Access
 
 ### `:eden/get`
 Get a value from the context data.
+
 ```clojure
 [:eden/get :title]                ; Get title from data
 [:eden/get :missing "default"]    ; With default value
 ```
 
+**Special Behavior:**
+- Keys in `:content/*` namespace return `RawString` for raw HTML rendering
+- Content from markdown files is automatically converted to HTML and stored under `:content/html`
+- While you can manually add `:content/html` in EDN files with raw HTML, this is discouraged
+- Missing keys without defaults show visible error indicator in development mode
+
 ### `:eden/get-in`
 Get nested values using a path vector.
+
 ```clojure
 [:eden/get-in [:user :profile :name]]     ; Nested access
 [:eden/get-in [:items 0 :title] "N/A"]    ; With default
 ```
 
+### `:eden/with`
+Merge map data into context.
+
+```clojure
+[:eden/with :product-details
+  [:div
+    [:h2 [:eden/get :name]]
+    [:p [:eden/get :description]]]]
+```
+
+## Control Flow
+
 ### `:eden/if`
 Conditional rendering based on truthiness.
+
 ```clojure
 [:eden/if :show-content
   [:div "Shows if truthy"]]
@@ -37,19 +58,34 @@ Conditional rendering based on truthiness.
 ### `:eden/each`
 Iterate over collections with powerful filtering, sorting, grouping, and limiting options.
 
+**Collection sources:** The collection key (e.g., `:posts`, `:items`) refers to a field in the current page's data context. This data comes from your content files (markdown frontmatter or EDN). 
+
+Example content file (`products.md`):
+```markdown
+{:title "Our Products"
+ :items [{:name "Widget" :price 99 :category :tools}
+         {:name "Gadget" :price 199 :category :electronics}]}
+---
+# Product Catalog
+Browse our selection...
+```
+
+Then in your template you can iterate with `[:eden/each :items ...]`.
+
 ```clojure
-;; Basic iteration
+;; Basic iteration over a field from page data
 [:ul
- [:eden/each :items
+ [:eden/each :items        ; :items from markdown frontmatter or EDN content
   [:li [:eden/get :name]]]]
 
-;; With all options
-[:eden/each :posts
- :where {:published true :type :blog}  ; Filter items
+;; With options (order matters for some combinations)
+[:eden/each :features      ; :features array from landing.edn (complex page)
+ :where {:published true :type :blog}  ; Filter (works with regular collections now!)
  :order-by [:date :desc]               ; Sort by field
- :limit 10                              ; Limit results
- :group-by :category                   ; Group by field
+ :limit 10                              ; Limit results  
  [:article [:eden/get :title]]]
+
+;; Note: :group-by changes the iteration structure - see below
 ```
 
 #### Special Collection: `:eden/all`
@@ -161,18 +197,25 @@ Inside `:eden/each`, the `:data` context becomes the current item:
 ```
 
 #### Filtering with `:where`
-The `:where` clause supports simple equality matching:
+The `:where` clause supports simple equality matching on all collection types:
 ```clojure
-;; Single condition
+;; Filter regular collections (now works!)
 [:eden/each :posts :where {:published true} ...]
 
 ;; Multiple conditions (AND logic)
 [:eden/each :products :where {:category :electronics 
                                :featured true} ...]
 
-;; With :eden/all
+;; Filter :eden/all content
 [:eden/each :eden/all :where {:type :testimonial
                                :homepage true} ...]
+
+;; Works with all options
+[:eden/each :items
+ :where {:active true :category :tools}
+ :order-by [:priority :desc]
+ :limit 5
+ ...]
 ```
 
 #### Sorting with `:order-by`
@@ -191,19 +234,196 @@ The `:where` clause supports simple equality matching:
 
 #### Best Practices
 1. **Use keywords for enum-like values in `:where`**: `:type :blog` not `:type "blog"`
-2. **Access parent context carefully**: Data context switches to each item
-3. **Combine with `:eden/link` for dynamic links**: Use `[:eden/get :content-key]` pattern
-4. **Limit results for performance**: Use `:limit` for large collections
-5. **Group and sort together**: Often used for organized navigation menus
+2. **Filter early**: Use `:where` to reduce the dataset before sorting/grouping
+3. **Access parent context carefully**: Data context switches to each item
+4. **Combine with `:eden/link` for dynamic links**: Use `[:eden/get :content-key]` pattern  
+5. **Limit results for performance**: Use `:limit` for large collections
+6. **Group and sort together**: Often used for organized navigation menus
+7. **Remember `:group-by` changes structure**: Must iterate `:eden.each/group-items` within groups
 
-### `:eden/with`
-Merge map data into context.
+## Content Inclusion
+
+### `:eden/body`
+Insert content passed to a wrapper template.
 ```clojure
-[:eden/with :product-details
-  [:div
-    [:h2 [:eden/get :name]]
-    [:p [:eden/get :description]]]]
+[:html
+  [:body
+    [:main [:eden/body]]]]         ; Page content goes here
 ```
+
+### `:eden/include`
+Include another template directly.
+```clojure
+[:eden/include :header]
+[:eden/include :nav {:active :home}]  ; With additional context
+```
+
+### `:eden/render`
+Renders a component with specific data and template, creating reusable page sections with isolated data contexts.
+
+#### Syntax Forms
+```clojure
+[:eden/render content-key]         ; Simple form
+[:eden/render {:options}]          ; Map form with options
+```
+
+#### Parameters
+- `content-key` - Simple form, uses content as data source
+- Options map:
+  - `:data` - Content key to render (becomes the new `:data` context)
+  - `:template` - Template to use for rendering
+  - `:section-id` - Create linkable section (registers for fragment URLs)
+
+#### Data Context Behavior
+`:eden/render` replaces the current `:data` context with the specified content. The rendered template only has access to this new data (plus global context like `:lang`, `:strings`, `:build-constants`).
+
+#### Template Resolution
+When no explicit `:template` is provided:
+1. Checks for `:template` field in the content's frontmatter/data
+2. Falls back to using the content key as template name
+3. Shows error if neither exists
+
+#### Examples
+
+**Default Template Behavior**
+```clojure
+;; If content/en/team-intro.md has frontmatter {:template :hero ...}
+[:eden/render :team-intro]         ; Automatically uses :hero template
+```
+
+**Rendering Markdown Content as Sections**
+```clojure
+;; content/en/features/security.md:
+;; ---
+;; {:title "Security Features"
+;;  :icon "shield"
+;;  :priority 1}
+;; ---
+;; # Enterprise-grade Security
+;; We protect your data with industry-leading encryption...
+
+;; In template:
+[:eden/render {:data :features.security
+               :template :feature-card
+               :section-id "security"}]    ; Creates #security anchor on current page
+```
+
+**Building Pages from Multiple Content Files**
+```clojure
+;; Assembling a homepage from various markdown files
+[:div.homepage
+ [:eden/render {:data :home.hero
+                :template :hero-banner}]
+ 
+ [:eden/render {:data :home.features
+                :template :feature-grid
+                :section-id "features"}]
+ 
+ [:eden/render {:data :testimonials.featured
+                :template :testimonial-carousel
+                :section-id "testimonials"}]]
+```
+
+**Structured Data (EDN Use Case)**
+```clojure
+;; content/en/sidebar.edn - structured data without prose
+{:links [{:title "Documentation" :url "/docs"}
+         {:title "API Reference" :url "/api"}
+         {:title "GitHub" :url "https://github.com/..."}]
+ :recent-posts [:blog.post-1 :blog.post-2 :blog.post-3]
+ :template :sidebar-widget}
+
+;; In template:
+[:aside [:eden/render :sidebar]]   ; Uses :sidebar-widget template
+```
+
+**Dynamic Component Rendering**
+```clojure
+;; Render components based on data
+[:eden/each :page-sections
+ [:eden/render {:data [:eden/get :content-key]
+                :template [:eden/get :component-type]
+                :section-id [:eden/get :anchor]}]]
+```
+
+**Nested Component System**
+```clojure
+;; Dashboard composed of multiple widgets
+[:div.dashboard
+ [:div.row
+  [:div.col [:eden/render :metrics.revenue]]
+  [:div.col [:eden/render :metrics.users]]]
+ [:div.row
+  [:eden/render :alerts.critical]
+  [:eden/render :activity-feed]]]
+```
+
+#### Section vs Page Distinction
+
+- **Pages**: Standalone HTML files with their own URL (e.g., `/about`, `/services`)
+- **Sections**: Parts of the current page with anchor links (e.g., `#team`, `#pricing`)
+
+When you use `:section-id`:
+- The content becomes part of the current page (not a separate page)
+- Registers in the sections registry for `:eden/link` to reference
+- Generates fragment URLs (`#section-id`) for same-page links
+- Generates full URLs with fragments (`/page#section-id`) for cross-page links
+
+```clojure
+;; This creates a section, not a page:
+[:eden/render {:data :about.team
+               :template :team-grid
+               :section-id "team"}]
+
+;; Link to it from same page:
+[:eden/link :about.team ...]       ; Generates: #team
+
+;; Link to it from another page:
+[:eden/link :about.team ...]       ; Generates: /about#team
+```
+
+#### Context Inheritance
+The rendered component receives:
+- **Replaced**: `:data` (completely replaced with new content)
+- **Inherited**: `:lang`, `:strings`, `:build-constants`, `:site-config`, `:page->url`, `:warn!`
+- **Not inherited**: Parent's `:body`, `:path`
+
+#### Error Handling
+- **Missing content**: Shows error message in rendered output
+- **Missing template**: Falls back to displaying content key name with error
+- **Circular references**: Eden tracks render depth and warns about potential cycles
+
+#### Performance Notes
+- Content is loaded once and cached during build
+- Dependencies are tracked for incremental rebuilds
+- Sections are registered globally for link validation
+
+#### Common Patterns
+
+**FAQ Page with Linkable Sections**
+```clojure
+;; Each FAQ item from markdown becomes a linkable section
+[:div.faq
+ [:eden/each :faqs
+  [:eden/render {:data [:eden/get :content-key]
+                 :template :faq-item
+                 :section-id [:eden/get :slug]}]]]
+```
+
+**Product Features from Markdown**
+```clojure
+;; content/en/features/ contains multiple .md files
+[:section.features
+ [:h2 "Features"]
+ [:div.grid
+  [:eden/each :eden/all
+   :where {:category "feature"}
+   :order-by [:priority :asc]
+   [:eden/render {:data [:eden/get :content-key]
+                  :template :feature-card}]]]]
+```
+
+## Navigation
 
 ### `:eden/link`
 Create smart internal links. The body is a template that receives `:link/href` and `:link/title` in its context.
@@ -278,38 +498,11 @@ When linking to content that was rendered with a `:section-id`:
 - Different page: generates `/page#section-id`
 - Pages have priority over sections if both exist
 
-### `:eden/body`
-Insert content passed to a wrapper template.
-```clojure
-[:html
-  [:body
-    [:main [:eden/body]]]]         ; Page content goes here
-```
-
-### `:eden/include`
-Include another template directly.
-```clojure
-[:eden/include :header]
-[:eden/include :nav {:active :home}]  ; With additional context
-```
-
-### `:eden/render`
-Render content with a specific template. Can create linkable sections.
-```clojure
-[:eden/render :sidebar]            ; Simple component
-
-[:eden/render {:data :team.leadership
-               :template :team-grid
-               :section-id "leadership"}]  ; Creates #leadership anchor
-
-;; Dynamic rendering
-[:eden/each :widgets
-  [:eden/render {:data [:eden/get :content-key]
-                 :template [:eden/get :widget-type]}]]
-```
+## Internationalization
 
 ### `:eden/t`
 Translate strings using locale files.
+
 ```clojure
 [:eden/t :welcome]                 ; Simple translation
 [:eden/t :missing "Default"]       ; With fallback
@@ -317,44 +510,27 @@ Translate strings using locale files.
 [:eden/t [:errors :not-found]]     ; Nested keys
 ```
 
-## Important Patterns
-
-### Link Context
-`:eden/link` provides a template context, not just a link:
-```clojure
-;; CORRECT - eden/link wraps a template
-[:eden/link :about
-  [:div.link-wrapper
-    [:a {:href [:eden/get :link/href]}
-     [:span.icon "→"]
-     [:eden/get :link/title]]]]
-
-;; The body has access to:
-;; - :link/href - the generated URL
-;; - :link/title - the target page's title
-;; - All current context data
-```
-
-### No Hardcoded Strings
-Always use translations or content data:
+**Best Practice:** Always use translations or content data instead of hardcoded strings:
 ```clojure
 ;; GOOD - text from translations
-[:eden/link :about
-  [:a {:href [:eden/get :link/href]} 
-   [:eden/t :nav/about]]]
+[:button [:eden/t :buttons/submit]]
 
 ;; BAD - hardcoded string
-[:eden/link :about
-  [:a {:href [:eden/get :link/href]} 
-   "About Us"]]
+[:button "Submit"]
 ```
 
-### Dynamic vs Static Links
+Translation files are stored in `content/<lang>/strings.edn`:
 ```clojure
-;; Static - known at template time
-[:eden/link :products ...]
-
-;; Dynamic - from data/iteration
-[:eden/link [:eden/get :target-page] ...]
-[:eden/link [:eden/get-in [:nav :home-link]] ...]
+{:buttons/submit "Submit"
+ :greeting "Hello, {{name}}!"
+ :errors {:not-found "Page not found"}}
 ```
+
+## Content Structure
+
+Eden internally stores all content in EDN format. When processing markdown files:
+1. Markdown content is parsed and converted to HTML
+2. The HTML is stored under the `:content/html` key
+3. This HTML is returned as a `RawString` when accessed via `[:eden/get :content/html]`
+
+While you can manually add `:content/html` keys in EDN files with raw HTML strings, this is discouraged in favor of using markdown files for content with prose.

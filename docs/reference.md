@@ -531,8 +531,7 @@ Complete reference for all site.edn configuration options:
  :lang {:en {:name "English"
              :default true}   ; Default has no URL prefix
         :no {:name "Norsk"}   ; Creates /no/ URLs
-        :de {:name "Deutsch"  ; Creates /de/ URLs
-             :hidden true}}}  ; Hidden from language switchers
+        :de {:name "Deutsch"}}}  ; Creates /de/ URLs
 ```
 
 ### Advanced Configuration
