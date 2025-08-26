@@ -25,7 +25,7 @@
             ;;[clojure-mcp.tools.code-critique.tool :as code-critique-tool]
             ;;[clojure-mcp.tools.project.tool :as project-tool]
             ;;[clojure-mcp.tools.scratch-pad.tool :as scratch-pad-tool]
-))
+            ))
 
 (defonce nrepl-server-instance (atom nil))
 
@@ -96,8 +96,8 @@
      filtered-resources
      ;; Add Eden-specific documentation from resources
      (filter some?
-             [(load-mcp-resource "resources" "template-directives")
-              (load-mcp-resource "resources" "content-structure")
+             [(load-mcp-resource "resources" "overview")
+              (load-mcp-resource "resources" "template-directives")
               (load-mcp-resource "resources" "site-config")]))))
 
 (defn make-tools
@@ -186,6 +186,4 @@
 (comment
 
   (def server (start-stdio-server "site/site.edn"))
-  (tap> @mcp-core/nrepl-client-atom)
-
-)
+  (tap> @mcp-core/nrepl-client-atom))
