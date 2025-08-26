@@ -115,8 +115,11 @@
 
       (str/ends-with? path ".md")
       (let [parsed (parse-markdown (slurp (str file)))]
+        ;; Convert markdown to HTML immediately
         (if (:markdown/content parsed)
-          (assoc parsed :content/html (md/md-to-html-string (:markdown/content parsed)))
+          (-> parsed
+              (assoc :content/html (md/md-to-html-string (:markdown/content parsed)))
+              (dissoc :markdown/content)) ; Remove raw markdown to save memory
           parsed))
 
       :else nil)))
