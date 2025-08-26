@@ -623,7 +623,16 @@
 
                      ;; Regular collection from :data
                      :else
-                     (get-in context [:data collection-key]))]
+                     (let [coll (get-in context [:data collection-key])]
+                       ;; Apply where filter if provided and collection is sequential
+                       (if (and where (sequential? coll))
+                         (filterv (fn [item]
+                                    ;; Check all where conditions (AND logic)
+                                    (every? (fn [[k v]]
+                                              (= (get item k) v))
+                                            where))
+                                  coll)
+                         coll)))]
     (cond
       ;; Handle maps
       (map? collection)
@@ -689,9 +698,18 @@
       (sequential? collection)
       (if group-by
         ;; Group-by mode
-        (let [;; Group items by the specified field
+        (let [;; Apply where filter before grouping if provided
+              filtered-coll (if where
+                              (filterv (fn [item]
+                                         ;; Check all where conditions (AND logic)
+                                         (every? (fn [[k v]]
+                                                   (= (get item k) v))
+                                                 where))
+                                       collection)
+                              collection)
+              ;; Group items by the specified field
               group-path (if (vector? group-by) group-by [group-by])
-              grouped (clojure.core/group-by #(get-in % group-path) collection)
+              grouped (clojure.core/group-by #(get-in % group-path) filtered-coll)
               ;; Convert to vector of [group-key items] pairs to maintain order
               group-pairs (vec grouped)
               ;; Sort groups if order-by specified with :eden.each/group-key
@@ -740,7 +758,16 @@
                              [result]))) ; Wrap single element
                        (map-indexed vector limited-groups))))
         ;; Regular mode (no grouping) - with index
-        (let [sorted-coll (if order-by
+        (let [;; Apply where filter if provided
+              filtered-coll (if where
+                              (filterv (fn [item]
+                                         ;; Check all where conditions (AND logic)
+                                         (every? (fn [[k v]]
+                                                   (= (get item k) v))
+                                                 where))
+                                       collection)
+                              collection)
+              sorted-coll (if order-by
                             (let [order-specs (partition 2 order-by)
                                   comparators (map (fn [[field dir]]
                                                      (if (= dir :desc)
@@ -755,8 +782,8 @@
                                             (if (zero? result)
                                               (recur (rest comps))
                                               result)))))
-                                    collection))
-                            collection)
+                                    filtered-coll))
+                            filtered-coll)
               limited-coll (if limit
                              (take limit sorted-coll)
                              sorted-coll)]

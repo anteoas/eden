@@ -560,6 +560,37 @@
                               %))
                   result)))))
 
+(deftest test-eden-each-where-filter-with-regular-collection
+  (testing ":where filter should work with regular collections (not just :eden/all)"
+    (let [template [:eden/each :posts
+                    :where {:published true :type :blog}
+                    [:article [:eden/get :title]]]
+          context {:data {:posts [{:title "Blog Post 1" :published true :type :blog}
+                                  {:title "Blog Post 2" :published false :type :blog}
+                                  {:title "News Item" :published true :type :news}
+                                  {:title "Blog Post 3" :published true :type :blog}]}}
+          ;; Expected: only published blog posts
+          expected [[:article "Blog Post 1"]
+                    [:article "Blog Post 3"]]
+          actual (sg/process template context)]
+      (is (= expected actual)
+          "Should filter regular collections by :where conditions")))
+
+  (testing ":where filter with multiple conditions (AND logic)"
+    (let [template [:eden/each :products
+                    :where {:category :electronics :featured true}
+                    [:div [:eden/get :name]]]
+          context {:data {:products [{:name "Phone" :category :electronics :featured true}
+                                     {:name "Laptop" :category :electronics :featured false}
+                                     {:name "Tablet" :category :electronics :featured true}
+                                     {:name "Book" :category :books :featured true}]}}
+          ;; Expected: only featured electronics
+          expected [[:div "Phone"]
+                    [:div "Tablet"]]
+          actual (sg/process template context)]
+      (is (= expected actual)
+          "Should apply ALL conditions in :where clause (AND logic)"))))
+
 (deftest test-eden-each-group-by
   (testing ":eden/each with :group-by groups items by field"
     (let [template [:div
