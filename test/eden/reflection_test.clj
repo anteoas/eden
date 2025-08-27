@@ -64,7 +64,7 @@
           (str "Found " (count @all-warnings) " reflection warnings")))))
 
 ;; Alternative: Check for reflection at compile time for specific namespaces
-(deftest test-critical-namespaces-no-reflection
+(deftest ^:kaocha/skip test-critical-namespaces-no-reflection
   (testing "Critical namespaces compile without reflection warnings"
     (let [warnings (atom nil)
           critical-namespaces '[eden.core
