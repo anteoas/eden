@@ -97,3 +97,20 @@ The project should already have basic configuration if initialized with `clj -Te
 1. Start a server: `(eden.core/serve)` - tell the user to open http://localhost:3000
 2. After each change: `(eden.core/build)` - updates what they see
 3. Check build output for warnings - Eden guides you if something's missing
+
+## Common Pitfalls
+
+### Double Headings
+When your template renders `[:h1 [:eden/get :title]]`, don't repeat the heading in markdown:
+
+❌ **Wrong** - causes duplicate headings:
+```markdown
+{:title "About Us"}
+---
+# About Us
+We are a company...
+
+✅ Right - template handles the heading:
+{:title "About Us"}
+---
+We are a company...

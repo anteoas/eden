@@ -527,10 +527,29 @@ Translation files are stored in `content/<lang>/strings.edn`:
 ```
 
 ## Content Structure
-
 Eden internally stores all content in EDN format. When processing markdown files:
 1. Markdown content is parsed and converted to HTML
 2. The HTML is stored under the `:content/html` key
 3. This HTML is returned as a `RawString` when accessed via `[:eden/get :content/html]`
 
 While you can manually add `:content/html` keys in EDN files with raw HTML strings, this is discouraged in favor of using markdown files for content with prose.
+
+### Content Patterns
+
+**For pages with templates that render titles:**
+- Frontmatter `:title` → Used by template for heading
+- Markdown content → Start directly with your prose
+- Don't duplicate the title as a # heading
+
+**For raw content without title-rendering templates:**
+- Use # headings normally in markdown
+
+3. Add template-content contract documentation
+
+Make it clear what each template expects:
+
+### Template-Content Contract
+
+Templates define what they render. Check your template before writing content:
+- If template has `[:h1 [:eden/get :title]]` → Don't use # in markdown
+- If template has `[:eden/get :content/html]` only → Include your own headings
