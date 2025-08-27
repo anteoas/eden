@@ -19,6 +19,26 @@
       (is (= "/en/about" (:path (#'builder/calculate-page-path ctx {:lang-code :en :slug "about"}))))
       (is (= "/en/products" (:path (#'builder/calculate-page-path ctx {:lang-code :en :slug "products"}))))))
 
+  (testing "Index pages should have language prefix for non-default languages"
+    (let [ctx {:default-lang :en}]
+      ;; Default language index should be at root
+      (is (= "/" (:path (#'builder/calculate-page-path ctx {:lang-code :en :is-index true :slug "home"})))
+          "English (default) index should be at /")
+      ;; Non-default language index should have language prefix
+      (is (= "/no/" (:path (#'builder/calculate-page-path ctx {:lang-code :no :is-index true :slug "home"})))
+          "Norwegian (non-default) index should be at /no/ not /")))
+
+  (testing "Multiple languages with correct index page paths"
+    (let [ctx {:default-lang :en}]
+      ;; Test with multiple non-default languages
+      (is (= "/de/" (:path (#'builder/calculate-page-path ctx {:lang-code :de :is-index true :slug "home"})))
+          "German index should be at /de/")
+      (is (= "/fr/" (:path (#'builder/calculate-page-path ctx {:lang-code :fr :is-index true :slug "home"})))
+          "French index should be at /fr/")
+      ;; Regular pages still work correctly
+      (is (= "/de/about" (:path (#'builder/calculate-page-path ctx {:lang-code :de :is-index false :slug "about"})))
+          "German about page should be at /de/about")))
+
   (testing "No .html extension in paths"
     (let [ctx {:default-lang :no}
           page {:lang-code :no :slug "test-page"}

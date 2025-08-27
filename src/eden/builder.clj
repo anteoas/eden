@@ -122,7 +122,8 @@
                     slug (str "/" slug)
                     :else (str "/" (name (:content-key page)))) ; Fallback
         ;; Add language prefix for non-default languages
-        final-path (if (or (= lang-code default-lang) is-index)
+        ;; Only skip prefix if BOTH: default language AND (index OR regular page)
+        final-path (if (= lang-code default-lang)
                      base-path
                      (str "/" (name lang-code) base-path))]
     (assoc page :path final-path)))
