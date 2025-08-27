@@ -3,7 +3,6 @@
             [clojure.set :as set]
             [clojure.walk :as walk]
             [eden.site-generator :as sg]
-            [eden.builder :as builder]
             [eden.loader :as loader]))
 
 (defn scan-for-sections
@@ -236,7 +235,8 @@
   [{:keys [pages config templates page->url content build-constants] :as ctx}]
   ;; First build the page registry from all pages
   ;; Use resolve to avoid cyclic dependency
-  (let [pages-registry (builder/build-page-registry pages)
+  (let [build-page-registry-fn (requiring-resolve 'eden.builder/build-page-registry)
+        pages-registry (@build-page-registry-fn pages)
         ;; Load translation strings for all languages
         strings (reduce (fn [acc [lang-code _]]
                           (if-let [lang-strings (loader/load-translation-strings
