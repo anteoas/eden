@@ -1,6 +1,7 @@
 (ns eden.report
   (:require [replicant.string :as rs]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [eden.loader :as loader]))
 
 (defn- format-file-size
   "Format bytes into human-readable size"
@@ -134,7 +135,7 @@
 
 (defn print-build-report
   "Print a formatted build report with timings and warnings"
-  [{:keys [timings warnings results error]}]
+  [{:keys [timings warnings results error] :as ctx}]
   (println "  Build steps:")
 
   ;; Print each step timing
@@ -238,8 +239,28 @@
                                (pr-str (:template-id w))
                                (if stack-str (str " in: " stack-str) ""))))
 
+            :missing-translation
+            nil ; Will be handled separately below
+
             ;; Default
             (println (format "  - %s: %s" (:type w) (pr-str w))))))))
+
+  ;; Print missing translations grouped by language
+  (let [missing-translations (filter #(= :missing-translation (:type %))
+                                     (:page-warnings warnings))]
+    (when (seq missing-translations)
+      (let [by-lang (group-by :lang missing-translations)
+            config (get-in ctx [:results :load :config])
+            root-path (:root-path config)]
+        (println "\n⚠️  Missing translations:")
+        (doseq [[lang translations] by-lang]
+          (println (format "  Language: %s" (name lang)))
+          (doseq [t translations]
+            (println (format "    - %s" (:key t))))
+          ;; Show where we looked for translations
+          (when root-path
+            (let [strings-path (loader/translation-file-path root-path lang)]
+              (println (format "  Expected in: %s" strings-path))))))))
 
   ;; Print warnings (non-page warnings)
   (when (seq (:missing-keys warnings))

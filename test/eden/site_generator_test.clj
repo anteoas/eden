@@ -1063,8 +1063,16 @@
           context {:lang :no
                    :strings {:other/key "Something"}}
           result (sg/process template context)]
-      ;; Should return the key as string
-      (is (= [:span "### :missing/key ###"] result))))
+      ;; Should return result with warnings (like :eden/link does for missing pages)
+      (is (map? result))
+      (is (contains? result :result))
+      (is (contains? result :warnings))
+      (is (= [:span "### :missing/key ###"] (:result result)))
+      ;; Should collect warning
+      (is (= 1 (count (:warnings result))))
+      (is (= :missing-translation (-> result :warnings first :type)))
+      (is (= :missing/key (-> result :warnings first :key)))
+      (is (= :no (-> result :warnings first :lang)))))
 
   (testing ":eden/t with default fallback"
     (let [template [:span [:eden/t :missing/key "Default text"]]

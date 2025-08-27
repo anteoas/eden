@@ -189,7 +189,13 @@
 
       ;; Missing translation
       :else
-      (str "### " key-or-path " ###"))))
+      (do
+        (when-let [warn! (:warn! context)]
+          (warn! {:type :missing-translation
+                  :key key-or-path
+                  :lang (:lang context)
+                  :location (get-render-stack context)}))
+        (str "### " key-or-path " ###")))))
 
 ;; :eden/link - Smart linking directive
 (defmethod process-element :eden/link [elem context]
@@ -226,7 +232,7 @@
                                 (page->url {:slug (:slug page)
                                             :lang target-lang
                                             :site-config (:site-config context)})
-                               ;; Fallback
+                                ;; Fallback
                                 (str "/" (when (and target-lang
                                                     (not (#{:no nil} target-lang)))
                                            (str (name target-lang) "/"))
@@ -272,16 +278,16 @@
 
       ;; Find target
       (let [target (cond
-                    ;; Navigation link
+                     ;; Navigation link
                      nav (find-nav-target nav)
 
-                    ;; Content link
+                     ;; Content link
                      page-id
                      (let [page (get-in context [:pages page-id])
                            section (get-in context [:sections page-id])
                            current-page (:current-page-id context)]
 
-                      ;; Warn about ambiguity
+                       ;; Warn about ambiguity
                        (when (and page section (:warn! context))
                          ((:warn! context) {:type :ambiguous-link
                                             :link-id page-id

@@ -179,10 +179,15 @@
        {}
        (.listFiles content-dir)))))
 
+(defn translation-file-path
+  "Get the expected path for a language's translation file"
+  [root-path lang-code]
+  (str (io/file root-path "content" (str "strings." (name lang-code) ".edn"))))
+
 (defn load-translation-strings
   "Load translation strings for a language"
   [root-path lang-code]
-  (let [file (io/file root-path "content" (str "strings." (name lang-code) ".edn"))]
+  (let [file (io/file (translation-file-path root-path lang-code))]
     (when (.exists file)
       (edn/read-string (slurp file)))))
 
