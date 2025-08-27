@@ -5,7 +5,8 @@
             [clojure.java.io :as io]
             [markdown.core :as md]
             [sci.core :as sci]
-            [eden.config :as config]))
+            [eden.config :as config])
+  (:import [java.io File]))
 
 (defn load-template
   "Load a single template file. Returns template data or function."
@@ -150,17 +151,17 @@
     (when (.exists content-dir)
       (reduce
        (fn [acc lang-dir]
-         (if (and (.isDirectory lang-dir)
-                  (not (str/starts-with? (.getName lang-dir) ".")))
-           (let [lang-code (keyword (.getName lang-dir))
+         (if (and (File/.isDirectory lang-dir)
+                  (not (str/starts-with? (File/.getName lang-dir) ".")))
+           (let [lang-code (keyword (File/.getName lang-dir))
                  ;; Walk the language directory recursively
                  content-files (->> (file-seq lang-dir)
-                                    (filter #(.isFile %))
-                                    (filter #(let [name (.getName %)]
+                                    (filter #(File/.isFile %))
+                                    (filter #(let [name (File/.getName %)]
                                                (or (str/ends-with? name ".edn")
                                                    (str/ends-with? name ".md"))))
                                     ;; Skip strings files
-                                    (remove #(str/starts-with? (.getName %) "strings.")))]
+                                    (remove #(str/starts-with? (File/.getName %) "strings.")))]
              ;; Load each content file
              (assoc acc lang-code
                     (reduce (fn [lang-acc file]
