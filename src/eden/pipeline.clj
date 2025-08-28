@@ -12,16 +12,15 @@
    Short-circuits if an error is present in the context."
   [ctx step-fn step-name]
   (if (:error ctx)
-    ctx ; Short-circuit on error
+    ctx ;; Short-circuit on error
     (let [start (System/currentTimeMillis)
           {:keys [result warnings error]} (try
                                             (step-fn ctx)
                                             (catch Exception e
                                               {:error (.getMessage e)}))
           elapsed (- (System/currentTimeMillis) start)]
-      (cond-> ctx
+      (cond-> (update ctx :timings assoc step-name elapsed)
         result (assoc-in [:results step-name] result)
-        true (update :timings assoc step-name elapsed)
         warnings (update :warnings (fn [old-warnings]
                                      (merge-with (fn [old new]
                                                    (concat (or old []) (or new [])))

@@ -3,21 +3,23 @@
             [eden.renderer :as renderer]))
 
 (defn build-page-registry
-  "Build a registry of all pages from loaded content"
+  "Build a registry of all pages from loaded content, organized by language"
   [pages]
   (reduce (fn [registry page]
-            (when-let [content (:content page)]
+            (if-let [content (:content page)]
               (let [page-id (:content-key page)
+                    lang-code (:lang-code page)
                     slug (:slug content)
                     title (:title content)]
                 (if (and slug title)
-                  ;; Include all content metadata in the registry
-                  (assoc registry page-id content)
+                  ;; Include all content metadata in the registry, nested by language
+                  (assoc-in registry [lang-code page-id] content)
                   (do
-                    (println (str "WARNING: Page " page-id " missing required fields"))
+                    (println (str "WARNING: Page " page-id " (" lang-code ") missing required fields"))
                     (when-not slug (println "  - Missing :slug"))
                     (when-not title (println "  - Missing :title"))
-                    registry)))))
+                    registry)))
+              registry))
           {}
           pages))
 
@@ -142,7 +144,7 @@
      :content - All loaded content organized by language
    
    Returns map with :html-files and :warnings"
-  [{:keys [config templates] :as context} _opts]
+  [{:keys [config templates] :as ctx} _opts]
   ;; Validate wrapper template exists
   (when-not (get templates (:wrapper config))
     (throw (ex-info (str "Wrapper template '" (:wrapper config) "' not found")
@@ -154,7 +156,7 @@
                          #{(:index config)}) ; Fallback to just index if nothing specified
 
         ;; Phase 1: Analyze - expand templates, scan sections, collect dependencies
-        analyzed-ctx (-> (renderer/expand-all-templates context)
+        analyzed-ctx (-> (renderer/expand-all-templates ctx)
                          (renderer/scan-for-sections))
         deps-result (renderer/collect-dependencies-and-pages
                      (assoc analyzed-ctx :render-roots render-roots))

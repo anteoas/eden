@@ -1134,8 +1134,8 @@
                     [:a {:href [:eden/get :link/href]} [:eden/get :link/title]]]
           context {:lang :no
                    :path [] ; at root
-                   :pages {:privacy {:slug "personvern"
-                                     :title "Personvern"}}}
+                   :pages {:no {:privacy {:slug "personvern"
+                                          :title "Personvern"}}}}
           result (sg/process template context)]
       (is (= [:a {:href "/personvern"} "Personvern"] result))))
 
@@ -1144,8 +1144,8 @@
                     [:a {:href [:eden/get :link/href]} [:eden/get :link/title]]]
           context {:lang :en
                    :path [] ; at root
-                   :pages {:privacy {:slug "privacy"
-                                     :title "Privacy"}}}
+                   :pages {:en {:privacy {:slug "privacy"
+                                          :title "Privacy"}}}}
           result (sg/process template context)]
       (is (= [:a {:href "/en/privacy"} "Privacy"] result))))
 
@@ -1154,8 +1154,8 @@
                     [:a.back-link {:href [:eden/get :link/href]} "Back to " [:eden/get :link/title]]]
           context {:lang :no
                    :path [:news :article] ; at /news/article
-                   :pages {:news {:slug "news"
-                                  :title "Aktuelt"}}}
+                   :pages {:no {:news {:slug "news"
+                                       :title "Aktuelt"}}}}
           result (sg/process template context)]
       (is (= [:a.back-link {:href "/news"} "Back to " "Aktuelt"] result))))
 
@@ -1166,8 +1166,8 @@
           context {:lang :no
                    :path [:privacy] ; at /privacy, parent is root
                    :strings {:nav/back-to "← Tilbake til"}
-                   :pages {:landing {:slug ""
-                                     :title "Forsiden"}}}
+                   :pages {:no {:landing {:slug ""
+                                          :title "Forsiden"}}}}
           result (sg/process template context)]
       (is (= [:a.back-link {:href "/"}
               "← Tilbake til" " " "Forsiden"] result))))
@@ -1207,10 +1207,10 @@
                    :path [:products] ; current location
                    :strings {:nav/home "Hjem"
                              :nav/about "Om oss"}
-                   :pages {:home {:slug ""
-                                  :title "Forsiden"}
-                           :about {:slug "om-oss"
-                                   :title "Om oss"}}}
+                   :pages {:no {:home {:slug ""
+                                       :title "Forsiden"}
+                                :about {:slug "om-oss"
+                                        :title "Om oss"}}}}
           result (sg/process template context)]
       (is (= [:nav
               [:ul
@@ -1226,8 +1226,8 @@
           context {:lang :no
                    :path [:news :article] ; current location
                    :strings {:common/read-more "Les mer"}
-                   :pages {:products {:slug "produkter"
-                                      :title "Våre produkter"}}}
+                   :pages {:no {:products {:slug "produkter"
+                                           :title "Våre produkter"}}}}
           result (sg/process template context)]
       (is (= [:div.card
               [:a {:href "/produkter"}
@@ -1241,8 +1241,8 @@
           context {:data {:has-parent true}
                    :lang :no
                    :path [:about] ; has parent (root)
-                   :pages {:landing {:slug ""
-                                     :title "Forsiden"}}}
+                   :pages {:no {:landing {:slug ""
+                                          :title "Forsiden"}}}}
           result (sg/process template context)]
       (is (= [:a.back {:href "/"} "Forsiden"] result))))
 
@@ -1253,8 +1253,8 @@
           context {:lang :no
                    :path [:news :my-article] ; at /news/my-article
                    :strings {:nav/back-to "← Tilbake til"}
-                   :pages {:news {:slug "news"
-                                  :title "Aktuelt"}}}
+                   :pages {:no {:news {:slug "news"
+                                       :title "Aktuelt"}}}}
           result (sg/process template context)]
       ;; Should use absolute path
       (is (= [:a.back-link {:href "/news"}
@@ -1265,8 +1265,8 @@
                     [:a {:href [:eden/get :link/href]} [:eden/get :link/title]]]
           context {:lang :no
                    :path [:products :logistics :logifish] ; at /products/logistics/logifish
-                   :pages {:logistics {:slug "products/logistics"
-                                       :title "Logistikk"}}}
+                   :pages {:no {:logistics {:slug "products/logistics"
+                                            :title "Logistikk"}}}}
           result (sg/process template context)]
       ;; Parent is [:products :logistics], should resolve to /products/logistics
       (is (= [:a {:href "/products/logistics"} "Logistikk"] result))))
@@ -1276,8 +1276,8 @@
                     [:a {:href [:eden/get :link/href]} [:eden/get :link/title]]]
           context {:lang :no
                    :path [:news :article] ; at /news/article
-                   :pages {:home {:slug ""
-                                  :title "Forsiden"}}}
+                   :pages {:no {:home {:slug ""
+                                       :title "Forsiden"}}}}
           result (sg/process template context)]
       ;; Should use absolute path to root
       (is (= [:a {:href "/"} "Forsiden"] result))))
@@ -1287,8 +1287,8 @@
                     [:a {:href [:eden/get :link/href]} [:eden/get :link/title]]]
           context {:lang :no
                    :path [:news :article :comments] ; deeply nested
-                   :pages {:landing {:slug ""
-                                     :title "Forsiden"}}}
+                   :pages {:no {:landing {:slug ""
+                                          :title "Forsiden"}}}}
           result (sg/process template context)]
       ;; Should link to root
       (is (= [:a {:href "/"} "Forsiden"] result))))
@@ -1298,8 +1298,8 @@
                     [:a {:href [:eden/get :link/href]} [:eden/get :link/title]]]
           context {:lang :no
                    :path [:news] ; current location doesn't matter
-                   :pages {:about {:slug "om-oss"
-                                   :title "Om oss"}}}
+                   :pages {:no {:about {:slug "om-oss"
+                                        :title "Om oss"}}}}
           result (sg/process template context)]
       ;; Should link to the specified page
       (is (= [:a {:href "/om-oss"} "Om oss"] result))))
@@ -1309,8 +1309,10 @@
                     [:a {:href [:eden/get :link/href]} "English"]]
           context {:lang :no
                    :path [:products] ; on products page
-                   :pages {:products {:slug "products"
-                                      :title "Products"}}
+                   :pages {:no {:products {:slug "produkter"
+                                           :title "Produkter"}}
+                           :en {:products {:slug "products"
+                                           :title "Products"}}}
                    :site-config {:lang {:en {} :no {}}}} ; Configure languages
           result (sg/process template context)]
       ;; Should link to current page in English
@@ -1321,8 +1323,10 @@
                     [:a {:href [:eden/get :link/href]} "Norsk"]]
           context {:lang :en
                    :path [:products] ; on English products page
-                   :pages {:products {:slug "produkter"
-                                      :title "Produkter"}}
+                   :pages {:no {:products {:slug "produkter"
+                                           :title "Produkter"}}
+                           :en {:products {:slug "products"
+                                           :title "Products"}}}
                    :site-config {:lang {:en {} :no {}}}}
           result (sg/process template context)]
       ;; Should link to current page in Norwegian (no prefix)
@@ -1333,8 +1337,10 @@
                     [:a {:href [:eden/get :link/href]} "English"]]
           context {:lang :no
                    :path [:landing] ; on home page
-                   :pages {:landing {:slug ""
-                                     :title "Forsiden"}}
+                   :pages {:no {:landing {:slug ""
+                                          :title "Forsiden"}}
+                           :en {:landing {:slug ""
+                                          :title "Home"}}}
                    :site-config {:lang {:en {} :no {}}}}
           result (sg/process template context)]
       ;; Should link to English home
@@ -1345,8 +1351,8 @@
                     [:a {:href [:eden/get :link/href]} [:eden/get :link/title]]]
           context {:lang :no
                    :path [:products] ; current page doesn't matter
-                   :pages {:about {:slug "about"
-                                   :title "About Us"}}
+                   :pages {:en {:about {:slug "about"
+                                        :title "About Us"}}}
                    :site-config {:lang {:en {} :no {}}}}
           result (sg/process template context)]
       ;; Should link to specific page in specific language
@@ -1360,8 +1366,10 @@
                      [:a {:href [:eden/get :link/href]} "English"]]]
           context {:lang :en
                    :path [:contact] ; on English contact page
-                   :pages {:contact {:slug "kontakt"
-                                     :title "Kontakt"}}
+                   :pages {:no {:contact {:slug "kontakt"
+                                          :title "Kontakt"}}
+                           :en {:contact {:slug "kontakt"
+                                          :title "Kontakt"}}}
                    :site-config {:lang {:en {} :no {}}}}
           result (sg/process template context)]
       ;; Should create language switcher for current page
@@ -1511,7 +1519,8 @@
           context {:data {:products {:logistics {:title "Anteo Logistikk"
                                                  :items [{:name "Kartverktøy"}
                                                          {:name "Logifish"}]}}}
-                   :pages {:products {:slug "produkter" :title "Produkter"}}}
+                   :pages {:no {:products {:slug "produkter" :title "Produkter"}}}
+                   :lang :no}
           expected [:div.footer-section
                     [:h4 "Anteo Logistikk"]
                     [:a {:href "/produkter"} "Kartverktøy"]
@@ -1539,7 +1548,7 @@
 
 (deftest test-eden-link-with-sections
   (testing "Link to section on current page"
-    (let [context {:pages {:products {:slug "produkter"}}
+    (let [context {:pages {:no {:products {:slug "produkter"}}}
                    :current-page-id :products
                    :sections {:logifish {:section-id "logifish"
                                          :parent-template :products}}
@@ -1550,8 +1559,8 @@
       (is (= [:a {:href "#logifish"} "See Logifish"] result))))
 
   (testing "Link to section on different page"
-    (let [context {:pages {:products {:slug "produkter"}
-                           :about {:slug "om-oss"}}
+    (let [context {:pages {:no {:products {:slug "produkter"}
+                                :about {:slug "om-oss"}}}
                    :current-page-id :about
                    :sections {:logifish {:section-id "logifish"
                                          :parent-template :products}}
@@ -1562,8 +1571,8 @@
       (is (= [:a {:href "/produkter#logifish"} "See Logifish"] result))))
 
   (testing "Link to standalone page (no section)"
-    (let [context {:pages {:products {:slug "produkter"}
-                           :logifish {:slug "logifish"}}
+    (let [context {:pages {:no {:products {:slug "produkter"}
+                                :logifish {:slug "logifish"}}}
                    :current-page-id :products
                    :sections {} ; No sections registered
                    :lang :no}
@@ -1573,8 +1582,8 @@
       (is (= [:a {:href "/logifish"} "Logifish Page"] result))))
 
   (testing "Link resolution priority: standalone page over section with warning"
-    (let [context {:pages {:products {:slug "produkter"}
-                           :logifish {:slug "logifish-page"}} ; Standalone page exists
+    (let [context {:pages {:no {:products {:slug "produkter"}
+                                :logifish {:slug "logifish-page"}}} ; Standalone page exists
                    :current-page-id :products
                    :sections {:logifish {:section-id "logifish" ; Also a section
                                          :parent-template :products}}
@@ -1599,7 +1608,8 @@
                      [:p [:eden/get-in [:products :logistics :description]]]]]
           content {:data {:products {:logistics {:description "Logistics description"}
                                      :fish-health {:description "Fish description"}}}
-                   :pages {:logistics {:slug "logistikk" :title "Anteo Logistikk"}}}
+                   :pages {:no {:logistics {:slug "logistikk" :title "Anteo Logistikk"}}}
+                   :lang :no}
           expected [:div
                     [:h2 "Anteo Logistikk"]
                     [:p "Logistics description"]]
@@ -1609,7 +1619,8 @@
   (testing ":eden/link with missing parent data"
     (let [template [:eden/link :about
                     [:div [:eden/get-in [:missing :data]]]]
-          content {:pages {:about {:slug "om-oss" :title "Om oss"}}}
+          content {:pages {:no {:about {:slug "om-oss" :title "Om oss"}}}
+                   :lang :no}
           expected [:div "missing.data"]
           result (sg/process template content)]
       (is (= expected result) "Should handle missing data gracefully"))))
@@ -1689,7 +1700,8 @@
     (let [template [:eden/link :non-existent-page
                     [:a {:href [:eden/get :link/href]}
                      [:eden/get :link/title]]]
-          content {:pages {:about {:slug "om-oss" :title "Om oss"}}}
+          content {:pages {:no {:about {:slug "om-oss" :title "Om oss"}}}
+                   :lang :no}
           result (sg/process template content)]
       ;; Should return result and warnings
       (is (map? result))
@@ -1714,7 +1726,8 @@
 
   (testing "Found pages don't generate warnings"
     (let [template [:eden/link :about [:a {:href [:eden/get :link/href]} "About"]]
-          content {:pages {:about {:slug "om-oss" :title "Om oss"}}}
+          content {:pages {:no {:about {:slug "om-oss" :title "Om oss"}}}
+                   :lang :no}
           result (sg/process template content)]
       ;; When no warnings, process returns the result directly
       (is (vector? result))
@@ -1776,11 +1789,12 @@
                                   :news.article2 {:type "news"
                                                   :title "Article 2"
                                                   :slug "news/article-2"}}
-                   :pages {:news.article1 {:slug "news/article-1"
-                                           :title "Article 1"}
-                           :news.article2 {:slug "news/article-2"
-                                           :title "Article 2"}}
-                   :page->url (fn [{:keys [slug]}] (str "/" slug))}
+                   :pages {:no {:news.article1 {:slug "news/article-1"
+                                                :title "Article 1"}
+                                :news.article2 {:slug "news/article-2"
+                                                :title "Article 2"}}}
+                   :page->url (fn [{:keys [slug]}] (str "/" slug))
+                   :lang :no}
           ;; Template that uses dynamic page-id
           template [:div
                     [:eden/each :eden/all :where {:type "news"}
@@ -1798,8 +1812,8 @@
 
   (testing "eden/link with map syntax doesn't support dynamic values"
     ;; This test documents the limitation - map values are NOT processed
-    (let [context {:pages {:about {:title "About Us"
-                                   :slug "about"}}
+    (let [context {:pages {:en {:about {:title "About Us"
+                                        :slug "about"}}}
                    :page->url (fn [{:keys [slug]}] (str "/" slug))
                    :current-page-id :about}
           ;; This syntax doesn't work - inner :eden/get is not evaluated

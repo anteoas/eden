@@ -243,26 +243,27 @@
 
         ;; Helper: find navigation target
         find-nav-target (fn [nav-type]
-                          (case nav-type
-                            :parent
-                            (let [path (:path context)]
-                              (cond
-                                (or (nil? path) (empty? path)) nil
-                                (= 1 (count path))
-                                (when-let [page (or (get-in context [:pages :landing])
-                                                    (get-in context [:pages :home]))]
-                                  {:page page :content-key :landing})
-                                :else
-                                (let [parent-id (last (butlast path))]
-                                  (when-let [page (get-in context [:pages parent-id])]
-                                    {:page page :content-key parent-id}))))
+                          (let [current-lang (:lang context)]
+                            (case nav-type
+                              :parent
+                              (let [path (:path context)]
+                                (cond
+                                  (or (nil? path) (empty? path)) nil
+                                  (= 1 (count path))
+                                  (when-let [page (or (get-in context [:pages current-lang :landing])
+                                                      (get-in context [:pages current-lang :home]))]
+                                    {:page page :content-key :landing})
+                                  :else
+                                  (let [parent-id (last (butlast path))]
+                                    (when-let [page (get-in context [:pages current-lang parent-id])]
+                                      {:page page :content-key parent-id}))))
 
-                            :root
-                            (when-let [page (or (get-in context [:pages :landing])
-                                                (get-in context [:pages :home]))]
-                              {:page page :content-key :landing})
+                              :root
+                              (when-let [page (or (get-in context [:pages current-lang :landing])
+                                                  (get-in context [:pages current-lang :home]))]
+                                {:page page :content-key :landing})
 
-                            nil))]
+                              nil)))]
 
     ;; Handle invalid language early
     (when (and lang (not lang-valid?))
@@ -277,13 +278,14 @@
       nil ; Skip rendering for invalid language
 
       ;; Find target
-      (let [target (cond
+      (let [target-lang (or lang (:lang context))
+            target (cond
                      ;; Navigation link
                      nav (find-nav-target nav)
 
                      ;; Content link
                      page-id
-                     (let [page (get-in context [:pages page-id])
+                     (let [page (get-in context [:pages target-lang page-id])
                            section (get-in context [:sections page-id])
                            current-page (:current-page-id context)]
 
@@ -292,7 +294,7 @@
                          ((:warn! context) {:type :ambiguous-link
                                             :link-id page-id
                                             :as-page (:slug page)
-                                            :as-section (str (get-in context [:pages (:parent-template section) :slug])
+                                            :as-section (str (get-in context [:pages target-lang (:parent-template section) :slug])
                                                              "#" (:section-id section))
                                             :resolved-to :page
                                             :location (get-render-stack context)}))
@@ -303,7 +305,7 @@
                          section
                          (if (= (:parent-template section) current-page)
                            {:section-link (str "#" (:section-id section))}
-                           (when-let [parent (get-in context [:pages (:parent-template section)])]
+                           (when-let [parent (get-in context [:pages target-lang (:parent-template section)])]
                              {:page parent
                               :content-key (:parent-template section)
                               :section-hash (:section-id section)}))

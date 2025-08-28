@@ -89,6 +89,7 @@
 (deftest test-build-page-registry
   (testing "build-page-registry preserves all content metadata"
     (let [pages [{:content-key :products.fishctrl
+                  :lang-code :en
                   :content {:slug "fishctrl"
                             :title "FishCtrl"
                             :type :product
@@ -96,6 +97,7 @@
                             :published true
                             :tagline "Complete fish welfare system"}}
                  {:content-key :products.logifish
+                  :lang-code :en
                   :content {:slug "logifish"
                             :title "Logifish"
                             :type :product
@@ -103,19 +105,21 @@
                             :published true
                             :featured true}}
                  {:content-key :news.article1
+                  :lang-code :en
                   :content {:slug "article-1"
                             :title "News Article"
                             :type :news
                             :date "2024-01-15"
                             :published false}}
                  {:content-key :about
+                  :lang-code :en
                   :content {:slug "about"
                             :title "About Us"
                             :type :page}}]
           registry (builder/build-page-registry pages)]
 
-      ;; Check that all pages are in registry
-      (is (= 4 (count registry)))
+      ;; Check that all pages are in registry under their language
+      (is (= 4 (count (get registry :en))))
 
       ;; Check that all metadata is preserved for products
       (is (= {:slug "fishctrl"
@@ -124,7 +128,7 @@
               :category "Anteo Fiskehelse"
               :published true
               :tagline "Complete fish welfare system"}
-             (:products.fishctrl registry)))
+             (get-in registry [:en :products.fishctrl])))
 
       (is (= {:slug "logifish"
               :title "Logifish"
@@ -132,7 +136,7 @@
               :category "Anteo Logistikk"
               :published true
               :featured true}
-             (:products.logifish registry)))
+             (get-in registry [:en :products.logifish])))
 
       ;; Check news article metadata
       (is (= {:slug "article-1"
@@ -140,33 +144,37 @@
               :type :news
               :date "2024-01-15"
               :published false}
-             (:news.article1 registry)))
+             (get-in registry [:en :news.article1])))
 
       ;; Check simple page
       (is (= {:slug "about"
               :title "About Us"
               :type :page}
-             (:about registry)))))
+             (get-in registry [:en :about])))))
 
   (testing "build-page-registry handles missing required fields"
     (let [pages [{:content-key :page1
+                  :lang-code :en
                   :content {:title "Page 1"}} ; missing slug
                  {:content-key :page2
+                  :lang-code :en
                   :content {:slug "page-2"}} ; missing title
                  {:content-key :page3
+                  :lang-code :en
                   :content {:slug "page-3"
                             :title "Page 3"
                             :type :page}}]
           registry (builder/build-page-registry pages)]
 
       ;; Pages with missing required fields should be excluded
-      (is (= 1 (count registry)))
-      (is (contains? registry :page3))
-      (is (not (contains? registry :page1)))
-      (is (not (contains? registry :page2)))))
+      (is (= 1 (count (get registry :en))))
+      (is (contains? (get registry :en) :page3))
+      (is (not (contains? (get registry :en) :page1)))
+      (is (not (contains? (get registry :en) :page2)))))
 
   (testing "build-page-registry preserves nested metadata"
     (let [pages [{:content-key :product1
+                  :lang-code :en
                   :content {:slug "product-1"
                             :title "Product 1"
                             :metadata {:author "John Doe"
@@ -181,5 +189,31 @@
                          :tags [:clojure :web]}
               :settings {:enabled true
                          :priority 10}}
-             (:product1 registry))
-          "Should preserve nested maps and collections"))))
+             (get-in registry [:en :product1]))
+          "Should preserve nested maps and collections")))
+
+  (testing "build-page-registry handles multiple languages"
+    (let [pages [{:content-key :home
+                  :lang-code :en
+                  :content {:slug "" :title "Welcome"}}
+                 {:content-key :home
+                  :lang-code :no
+                  :content {:slug "" :title "Velkommen"}}
+                 {:content-key :about
+                  :lang-code :en
+                  :content {:slug "about" :title "About Us"}}
+                 {:content-key :about
+                  :lang-code :no
+                  :content {:slug "om" :title "Om Oss"}}]
+          registry (builder/build-page-registry pages)]
+
+      ;; Check structure is nested by language
+      (is (= #{:en :no} (set (keys registry))))
+
+      ;; Check English pages
+      (is (= "Welcome" (get-in registry [:en :home :title])))
+      (is (= "About Us" (get-in registry [:en :about :title])))
+
+      ;; Check Norwegian pages
+      (is (= "Velkommen" (get-in registry [:no :home :title])))
+      (is (= "Om Oss" (get-in registry [:no :about :title]))))))
