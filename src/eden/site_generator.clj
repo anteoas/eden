@@ -206,143 +206,24 @@
         config (if (keyword? processed-spec)
                  {:content-key processed-spec}
                  processed-spec)
+        {:keys [content-key nav]} config]
 
-        ;; Extract config values
-        {:keys [content-key lang nav]} config
-        page-id (or content-key
-                    (when lang (last (:path context)))) ; Current page for lang switch
+    ;; Add reference if it's a content page
+    (when-let [add-reference! (:add-reference! context)]
+      (when (and content-key (not nav))
+        (add-reference! content-key)))
 
-        ;; Language check
-        lang-valid? (or (nil? lang)
-                        (get-in context [:site-config :lang lang]))
-
-        ;; Helper: process body with link context
-        process-body (fn [url title]
-                       (let [link-ctx (update context :data assoc
-                                              :link/href url
-                                              :link/title title)]
-                         (if (= 1 (count body))
+    ;; Create placeholders and process body
+    (let [placeholder-href (assoc config :type :eden.link.placeholder/href)
+          placeholder-title (assoc config :type :eden.link.placeholder/title)
+          link-ctx (update context :data assoc
+                           :link/href placeholder-href
+                           :link/title placeholder-title)
+          processed-body (if (= 1 (count body))
                            (process-element (first body) link-ctx)
-                           (vec (map #(process-element % link-ctx) body)))))
-
-        ;; Helper: generate URL for page
-        make-url (fn [page section-hash]
-                   (let [target-lang (or lang (:lang context))
-                         base (if-let [page->url (:page->url context)]
-                                (page->url {:slug (:slug page)
-                                            :lang target-lang
-                                            :site-config (:site-config context)})
-                                ;; Fallback
-                                (str "/" (when (and target-lang
-                                                    (not (#{:no nil} target-lang)))
-                                           (str (name target-lang) "/"))
-                                     (:slug page)))]
-                     (if section-hash
-                       (str base "#" section-hash)
-                       base)))
-
-        ;; Helper: find navigation target
-        find-nav-target (fn [nav-type]
-                          (let [current-lang (:lang context)]
-                            (case nav-type
-                              :parent
-                              (let [path (:path context)]
-                                (cond
-                                  (or (nil? path) (empty? path)) nil
-                                  (= 1 (count path))
-                                  (when-let [page (or (get-in context [:pages current-lang :landing])
-                                                      (get-in context [:pages current-lang :home]))]
-                                    {:page page :content-key :landing})
-                                  :else
-                                  (let [parent-id (last (butlast path))]
-                                    (when-let [page (get-in context [:pages current-lang parent-id])]
-                                      {:page page :content-key parent-id}))))
-
-                              :root
-                              (when-let [page (or (get-in context [:pages current-lang :landing])
-                                                  (get-in context [:pages current-lang :home]))]
-                                {:page page :content-key :landing})
-
-                              nil)))]
-
-    ;; Handle invalid language early
-    (when (and lang (not lang-valid?))
-      (when-let [warn! (:warn! context)]
-        (warn! {:type :unconfigured-language
-                :lang lang
-                :content-key page-id
-                :location (str "Template: " (get-in context [:render-stack 0 1] "unknown"))
-                :message (str "Language '" (name lang) "' not configured in site.edn")})))
-
-    (if-not lang-valid?
-      nil ; Skip rendering for invalid language
-
-      ;; Find target
-      (let [target-lang (or lang (:lang context))
-            target (cond
-                     ;; Navigation link
-                     nav (find-nav-target nav)
-
-                     ;; Content link
-                     page-id
-                     (let [page (get-in context [:pages target-lang page-id])
-                           section (get-in context [:sections page-id])
-                           current-page (:current-page-id context)]
-
-                       ;; Warn about ambiguity
-                       (when (and page section (:warn! context))
-                         ((:warn! context) {:type :ambiguous-link
-                                            :link-id page-id
-                                            :as-page (:slug page)
-                                            :as-section (str (get-in context [:pages target-lang (:parent-template section) :slug])
-                                                             "#" (:section-id section))
-                                            :resolved-to :page
-                                            :location (get-render-stack context)}))
-
-                       (cond
-                         page {:page page :content-key page-id}
-
-                         section
-                         (if (= (:parent-template section) current-page)
-                           {:section-link (str "#" (:section-id section))}
-                           (when-let [parent (get-in context [:pages target-lang (:parent-template section)])]
-                             {:page parent
-                              :content-key (:parent-template section)
-                              :section-hash (:section-id section)}))
-
-                         :else nil))
-
-                     :else nil)]
-
-        (cond
-          ;; Special case: nav :parent at root returns nil
-          (and (= nav :parent) (nil? target))
-          nil
-
-          ;; Normal target found
-          target
-          (let [[url title] (cond
-                              (:section-link target)
-                              [(:section-link target) ""]
-
-                              (:page target)
-                              [(make-url (:page target) (:section-hash target))
-                               (:title (:page target))]
-
-                              :else ["#" ""])]
-            (process-body url title))
-
-          ;; Handle missing target
-          :else
-          (do
-            (when (and (:warn! context) page-id)
-              ((:warn! context) {:type :missing-page
-                                 :content-key page-id
-                                 :render-stack (get-render-stack context)}))
-            (when (seq body)
-              (process-body "#" (if (keyword? processed-spec)
-                                  (name processed-spec)
-                                  (str processed-spec))))))))))
+                           (vec (map #(process-element % link-ctx) body)))]
+      {:eden/link-placeholder config
+       :body processed-body})))
 
 ;; Method implementations
 
@@ -477,9 +358,12 @@
           :template-id (str template-id)}
          (str "<!-- Eden render error: Missing template '" template-id "' -->")])
 
-      ;; Valid template exists - process normally
+;; Valid template exists - process normally
       :else
-      (let [;; Get data from content-data if data-key is specified
+      (let [;; Register section if present
+            _ (when (and section-id (:add-section! context))
+                ((:add-section! context) section-id {:parent (:content-key context)}))
+            ;; Get data from content-data if data-key is specified
             content-data (when data-key
                            (get-in context [:content-data data-key] {}))
             ;; Merge build-constants with component's content under :data

@@ -214,11 +214,19 @@
         page-url-strategy (or (:page-url-strategy config) :default)
         page->url (config/parse-page-url-strategy page-url-strategy)
         ;; Build constants computed once for entire build
-        build-constants {:eden/current-year (str (.getYear (java.time.LocalDate/now)))}]
+        build-constants {:eden/current-year (str (.getYear (java.time.LocalDate/now)))}
+        ;; Load translation strings for all languages
+        strings (reduce (fn [acc [lang-code _]]
+                          (if-let [lang-strings (load-translation-strings site-root lang-code)]
+                            (assoc acc lang-code lang-strings)
+                            acc))
+                        {}
+                        (:lang config))]
     {:config config
      :default-lang (config/find-default-language config)
      :templates (load-templates (io/file site-root "templates"))
      :content (load-all-content-files site-root)
+     :strings strings
      :build-constants build-constants
      :url->filepath url->filepath
      :page->url page->url}))

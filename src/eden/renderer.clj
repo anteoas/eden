@@ -306,3 +306,64 @@
           ;; Default
           (swap! messages conj (str "WARNING: " warning-type " - " (pr-str item))))))
     @messages))
+
+(defn render-page-new
+  "Render a single page, discovering references dynamically"
+  [{:keys [config templates content strings warn!] :as ctx} page-id]
+  ;; Check all languages for this page
+  (let [pages-by-lang (reduce (fn [acc [lang-code lang-content]]
+                                (if-let [page-content (get lang-content page-id)]
+                                  (assoc acc lang-code page-content)
+                                  acc))
+                              {}
+                              content)]
+    (if (empty? pages-by-lang)
+      ;; Page doesn't exist in any language
+      (warn! {:type :missing-content
+              :content-key page-id
+              :message (str "Page " page-id " not found in any language")})
+      ;; Render page for each language it exists in
+      (reduce (fn [results [lang-code page-content]]
+                (let [ ;; Determine template
+                      template-key (or (:template page-content) page-id)
+                      template (get templates template-key)
+                      wrapper (get templates (:wrapper config))
+
+                      ;; Get strings for this language
+                      lang-strings (get strings lang-code)
+
+                      ;; Build context for rendering
+                      render-context (assoc ctx
+                                            :data page-content
+                                            :lang lang-code
+                                            :content-key page-id
+                                            :strings lang-strings
+                                            ;; All content for languge
+                                            ;; Used as source for eden/each queries
+                                            :content-data (get content lang-code)
+                                            ;; Why do we rename this key?
+                                            ;; should be the same all the way
+                                            :site-config config
+                                            :path (cond-> []
+                                                    (not= (:index config) page-id) (conj page-id)))]
+
+                  (if (not template)
+                    (do
+                      (warn! {:type :missing-template
+                              :template template-key
+                              :content-key page-id
+                              :lang lang-code})
+                      results)
+                    ;; Process template and wrapper
+                    (let [page-html (sg/process template render-context)
+                          wrapper-context (assoc render-context :body page-html)
+                          wrapped-html (if wrapper
+                                         (sg/process wrapper wrapper-context)
+                                         page-html)]
+                      ;; Return page data with HTML containing placeholders
+                      (conj results {:content-key page-id
+                                     :lang-code lang-code
+                                     :html wrapped-html ; Still hiccup with placeholders
+                                     :slug (:slug page-content)})))))
+              []
+              pages-by-lang))))

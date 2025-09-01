@@ -1,5 +1,6 @@
 (ns eden.builder
   (:require [clojure.java.io :as io]
+            [clojure.walk :as walk]
             [eden.renderer :as renderer]))
 
 (defn build-page-registry
@@ -174,6 +175,140 @@
                       (filter :html)
                       (map #(select-keys % [:path :html :slug :lang-code :content-key])))
      :warnings (:warnings result)}))
+
+(defn resolve-links
+  "Post-process rendered pages to resolve link placeholders and convert to HTML"
+  [ctx {:keys [results sections warnings] :as state}]
+  (let [;; Helper to generate URL for a page
+        page->url (:page->url ctx)
+        config (:config ctx)
+        warnings-atom (atom warnings)
+
+        make-url (fn [page-id lang-code]
+                   (if-let [pages (get results page-id)]
+                     (if-let [page (first (filter #(= (:lang-code %) lang-code) pages))]
+                       (page->url {:slug (:slug page)
+                                   :lang lang-code
+                                   :site-config config})
+                       (str "#no-lang-" (name lang-code) "-" (name page-id)))
+                     (str "#no-page-" (name page-id))))
+
+        ;; Helper to get page title
+        get-title (fn [page-id lang-code]
+                    (if-let [pages (get results page-id)]
+                      (if-let [page (first (filter #(= (:lang-code %) lang-code) pages))]
+                        (or (:title page) (name page-id))
+                        (name page-id))
+                      (name page-id)))
+
+        ;; Resolve a content-key to either page URL or section anchor
+        resolve-link (fn [content-key current-page-id lang-code]
+                       (cond
+                         ;; Check if it's a page first (pages take precedence)
+                         (contains? results content-key)
+                         (make-url content-key lang-code)
+
+                         ;; Check if it's a section
+                         (contains? sections content-key)
+                         (let [section-parent (:parent (get sections content-key))]
+                           (if (= section-parent current-page-id)
+                             ;; Same page section
+                             (str "#" (name content-key))
+                             ;; Different page section
+                             (str (make-url section-parent lang-code) "#" (name content-key))))
+
+                         ;; Neither page nor section - broken link
+                         :else
+                         (do
+                           (swap! warnings-atom conj {:type :broken-link
+                                                      :from current-page-id
+                                                      :to content-key})
+                           (str "#broken-link-" (name content-key)))))
+
+        ;; Process a single page's hiccup to resolve placeholders
+        process-page (fn [page]
+                       (let [lang-code (:lang-code page)
+                             current-page-id (:content-key page)
+                             resolve-node (fn resolve-node [node]
+                                            (cond
+                                              ;; Link href placeholder
+                                              (and (map? node)
+                                                   (= :eden.link.placeholder/href (:type node)))
+                                              (cond
+                                                (:content-key node)
+                                                (resolve-link (:content-key node) current-page-id lang-code)
+
+                                                (:nav node)
+                                                "#nav-placeholder" ; TODO: implement nav resolution
+
+                                                (:lang node)
+                                                (make-url current-page-id (:lang node))
+
+                                                :else "#unknown-link-type")
+
+                                              ;; Link title placeholder
+                                              (and (map? node)
+                                                   (= :eden.link.placeholder/title (:type node)))
+                                              (cond
+                                                (:content-key node) (get-title (:content-key node) lang-code)
+                                                (:nav node) (str (:nav node))
+                                                :else "")
+
+                                              ;; Link placeholder structure - return just the body
+                                              (and (map? node)
+                                                   (:eden/link-placeholder node))
+                                              (:body node)
+
+                                              ;; Recursive processing
+                                              (vector? node) (mapv resolve-node node)
+                                              (map? node) (into {} (map (fn [[k v]] [k (resolve-node v)]) node))
+                                              :else node))
+                             ;; Walk the hiccup tree
+                             resolved-html (:html page)
+                             resolved (walk/prewalk resolve-node resolved-html)]
+                         (assoc page :html resolved)))]
+
+    ;; Process all pages in results and update warnings
+    (-> state
+        (update :results
+                (fn [results]
+                  (into {}
+                        (map (fn [[page-key pages]]
+                               [page-key (map process-page pages)])
+                             results))))
+        (assoc :warnings @warnings-atom))))
+
+(defn build-site-new
+  "New simplified rendering pipeline using dynamic discovery"
+  [{:keys [config] :as ctx}]
+  (let [initial-queue (into clojure.lang.PersistentQueue/EMPTY (:render-roots config))]
+    (loop [render-queue initial-queue
+           state {:attempted #{}
+                  :results {}
+                  :sections {}
+                  :references {}
+                  :warnings []}]
+      (if-let [page-id (peek render-queue)]
+        (let [references (atom #{})
+              sections (atom {})
+              warnings (atom [])
+              context (assoc ctx
+                             :add-reference! #(do (swap! references conj %) nil)
+                             :add-section! #(do (swap! sections assoc %1 %2) nil)
+                             :warn! #(do (swap! warnings conj %) nil))
+              ;; TODO: implement render-page-new that uses the context callbacks
+              result (renderer/render-page-new context page-id)
+              ;; Add newly discovered references to queue
+              updated-queue (into (pop render-queue) (remove (:attempted state) @references))]
+          (recur updated-queue
+                 (-> state
+                     (update :attempted conj page-id)
+                     (update :results assoc page-id result)
+                     (update :sections merge @sections)
+                     (update :references assoc page-id @references)
+                     (update :warnings into @warnings))))
+        ;; Queue empty - post-process to resolve link placeholders
+        (resolve-links ctx state)))))
 
 (defn write-output
   "Write HTML files to disk using the url->filepath strategy."
