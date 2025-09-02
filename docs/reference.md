@@ -139,7 +139,7 @@ Available in template during iteration:
  :group-by :category
  [:section
   [:h2 [:eden/get :eden.each/group-key]]
-  [:eden/each :eden.each/group-items
+  [:eden/each [:eden/get :eden.each/group-items]
    [:article [:eden/get :title]]]]]
 
 ;; Using index
@@ -371,7 +371,7 @@ Merges map data into the current context.
 
 ## :eden/body
 
-Inserts the body content, typically used in wrapper templates.
+Inserts the body content, only used in wrapper templates.
 
 ### Syntax
 ```clojure
@@ -379,7 +379,7 @@ Inserts the body content, typically used in wrapper templates.
 ```
 
 ### Usage
-Primarily in wrapper templates (e.g., `base.edn`):
+Only used in wrapper templates (e.g., `base.edn`):
 ```clojure
 [:html
  [:head
