@@ -37,7 +37,7 @@
   "Build HTML from templates and content"
   [ctx]
   (let [site-data (get-in ctx [:results :load])
-        {:keys [html-files warnings]} (builder/build-site site-data {:verbose false})
+        {:keys [html-files warnings]} (builder/build-site-new site-data #_{:verbose false})
 
         ;; Detect orphan content
         all-content (into #{}

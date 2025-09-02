@@ -1,11 +1,12 @@
 (ns eden.renderer
   (:require [replicant.string :as rs]
+            [clojure.string :as str]
             [clojure.set :as set]
             [clojure.walk :as walk]
             [eden.site-generator :as sg]
             [eden.loader :as loader]))
 
-(defn scan-for-sections
+#_(defn scan-for-sections
   "Scan expanded templates for :eden/render sections and build sections registry.
    Requires :expanded-templates in context."
   [{:keys [expanded-templates] :as ctx}]
@@ -32,7 +33,7 @@
     ;; Add sections to context (no duplicate detection or warnings)
     (assoc ctx :sections @sections)))
 
-(defn expand-all-templates
+#_(defn expand-all-templates
   "Expand all templates once and cache the results.
    
    Returns context with :expanded-templates added, containing:
@@ -87,7 +88,7 @@
          templates)]
     (assoc ctx :expanded-templates expanded-templates)))
 
-(defn collect-dependencies-and-pages
+#_(defn collect-dependencies-and-pages
   "Collect all templates that need to be processed and determine which ones should be rendered.
    
    Uses a breadth-first traversal to find all referenced templates via :eden/link, :eden/include, and :eden/render.
@@ -146,7 +147,7 @@
                      new-visited
                      (into pages-to-render refs-to-add)))))))))
 
-(defn render-page
+#_(defn render-page
   "Render page HTML if content exists. Returns page with :html and any :warnings."
   [{:keys [config templates pages-registry strings page->url content sections build-constants]} page]
   (if-let [page-content (:content page)]
@@ -230,7 +231,7 @@
                        :content-key (:content-key page)
                        :lang-code (:lang-code page)}])))
 
-(defn render-all-pages
+#_(defn render-all-pages
   "Render all pages and collect warnings"
   [{:keys [pages config templates page->url content build-constants] :as ctx}]
   ;; First build the page registry from all pages
@@ -268,7 +269,7 @@
            :warnings (when (seq warnings)
                        {:page-warnings warnings}))))
 
-(defn format-warnings
+#_(defn format-warnings
   "Format warnings for display. Takes the warnings map and returns formatted strings."
   [warnings]
   (let [messages (atom [])]
@@ -331,22 +332,23 @@
 
                       ;; Get strings for this language
                       lang-strings (get strings lang-code)
+                      
+                      page-data (assoc page-content
+                                       :lang lang-code)
 
                       ;; Build context for rendering
                       render-context (assoc ctx
-                                            :data page-content
+                                            :data page-data
                                             :lang lang-code
                                             :content-key page-id
                                             :strings lang-strings
                                             ;; All content for languge
                                             ;; Used as source for eden/each queries
+                                            ;; Should we include every language here?
                                             :content-data (get content lang-code)
                                             ;; Why do we rename this key?
                                             ;; should be the same all the way
-                                            :site-config config
-                                            :path (cond-> []
-                                                    (not= (:index config) page-id) (conj page-id)))]
-
+                                            :site-config config)]
                   (if (not template)
                     (do
                       (warn! {:type :missing-template
@@ -361,9 +363,9 @@
                                          (sg/process wrapper wrapper-context)
                                          page-html)]
                       ;; Return page data with HTML containing placeholders
-                      (conj results {:content-key page-id
-                                     :lang-code lang-code
-                                     :html wrapped-html ; Still hiccup with placeholders
-                                     :slug (:slug page-content)})))))
+                      (conj results 
+                            (assoc page-content
+                                   :lang-code lang-code
+                                   :html wrapped-html))))))
               []
               pages-by-lang))))

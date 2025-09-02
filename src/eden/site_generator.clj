@@ -271,9 +271,23 @@
 
 (defmethod process-element :eden/if [elem context]
   (let [[_ condition then-branch else-branch] elem
-        ;; Evaluate condition - check if it's an sg directive first
+        ;; Evaluate condition
         condition-value (cond
-                          ;; sg directive - process it
+                          ;; Handle comparison operators
+                          (and (vector? condition)
+                               (#{:= :!= :< :> :<= :>=} (first condition)))
+                          (let [[op a b] condition
+                                val-a (process-element a context)
+                                val-b (process-element b context)]
+                            (case op
+                              := (= val-a val-b)
+                              :!= (not= val-a val-b)
+                              :< (< val-a val-b)
+                              :> (> val-a val-b)
+                              :<= (<= val-a val-b)
+                              :>= (>= val-a val-b)))
+
+                          ;; Eden directive - process it
                           (and (vector? condition)
                                (keyword? (first condition))
                                (= "eden" (namespace (first condition))))
@@ -283,7 +297,7 @@
                           (keyword? condition)
                           (get-in context [:data condition])
 
-                          ;; Vector path (non-sg directive)
+                          ;; Vector path (non-Eden directive)
                           (and (vector? condition)
                                (keyword? (first condition)))
                           (get-in context (into [:data] condition))
@@ -414,7 +428,7 @@
           [:span.missing-content (str "[:eden/get " key "]")]))
 
       is-content-html?
-      (->RawString value)
+      [:span {:innerHTML value}]
 
       :else
       value)))

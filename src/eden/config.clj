@@ -46,7 +46,7 @@
             lang-prefix (when-not is-default-lang
                           (str "/" (name lang)))]
         (if (empty? slug)
-          (str lang-prefix "/")
+          (or lang-prefix "/")
           (str lang-prefix "/" slug))))
 
     (= strategy :with-extension)
@@ -63,7 +63,9 @@
             lang-prefix (when-not is-default-lang
                           (str "/" (name lang)))]
         (if (empty? slug)
-          (str lang-prefix "/index.html")
+          (if lang-prefix
+            (str lang-prefix "/index.html")
+            "/index.html")
           (str lang-prefix "/" slug ".html"))))
 
     (keyword? strategy)

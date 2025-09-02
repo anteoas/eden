@@ -1,49 +1,52 @@
 (ns eden.builder
   (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.walk :as walk]
+            [replicant.string :as rs]
+            [eden.config :as config]
             [eden.renderer :as renderer]))
 
-(defn build-page-registry
-  "Build a registry of all pages from loaded content, organized by language"
-  [pages]
-  (reduce (fn [registry page]
-            (if-let [content (:content page)]
-              (let [page-id (:content-key page)
-                    lang-code (:lang-code page)
-                    slug (:slug content)
-                    title (:title content)]
-                (if (and slug title)
+#_(defn build-page-registry
+    "Build a registry of all pages from loaded content, organized by language"
+    [pages]
+    (reduce (fn [registry page]
+              (if-let [content (:content page)]
+                (let [page-id (:content-key page)
+                      lang-code (:lang-code page)
+                      slug (:slug content)
+                      title (:title content)]
+                  (if (and slug title)
                   ;; Include all content metadata in the registry, nested by language
-                  (assoc-in registry [lang-code page-id] content)
-                  (do
-                    (println (str "WARNING: Page " page-id " (" lang-code ") missing required fields"))
-                    (when-not slug (println "  - Missing :slug"))
-                    (when-not title (println "  - Missing :title"))
-                    registry)))
-              registry))
-          {}
-          pages))
+                    (assoc-in registry [lang-code page-id] content)
+                    (do
+                      (println (str "WARNING: Page " page-id " (" lang-code ") missing required fields"))
+                      (when-not slug (println "  - Missing :slug"))
+                      (when-not title (println "  - Missing :title"))
+                      registry)))
+                registry))
+            {}
+            pages))
 
-(defn- validate-pages
-  "Validate that all pages have required fields"
-  [pages]
-  (let [invalid-pages (filter (fn [page]
-                                (let [content (:content page)]
-                                  (or (nil? (:slug content))
-                                      (nil? (:title content)))))
-                              pages)]
-    (when (seq invalid-pages)
-      (println "ERROR: The following pages are missing required fields:")
-      (doseq [page invalid-pages]
-        (let [content (:content page)]
-          (println (str "  - " (:content-key page) " (" (:lang-code page) ")")
-                   (when-not (:slug content) " [missing :slug]")
-                   (when-not (:title content) " [missing :title]"))))
-      (throw (ex-info "Pages missing required fields" {:invalid-pages invalid-pages})))
-    pages))
+#_(defn- validate-pages
+    "Validate that all pages have required fields"
+    [pages]
+    (let [invalid-pages (filter (fn [page]
+                                  (let [content (:content page)]
+                                    (or (nil? (:slug content))
+                                        (nil? (:title content)))))
+                                pages)]
+      (when (seq invalid-pages)
+        (println "ERROR: The following pages are missing required fields:")
+        (doseq [page invalid-pages]
+          (let [content (:content page)]
+            (println (str "  - " (:content-key page) " (" (:lang-code page) ")")
+                     (when-not (:slug content) " [missing :slug]")
+                     (when-not (:title content) " [missing :title]"))))
+        (throw (ex-info "Pages missing required fields" {:invalid-pages invalid-pages})))
+      pages))
 
-(defn- create-page-specs
-  "Create page specifications for each page that needs to be built.
+#_(defn- create-page-specs
+    "Create page specifications for each page that needs to be built.
    
    A 'page spec' is a map describing a single HTML page to be generated, containing:
    - :content-key - The page identifier (e.g., :landing, :about, :products.logistics)
@@ -61,83 +64,83 @@
    - {:content-key :about :lang-code :en :is-index false}
    
    The index page (specified in config) gets special treatment with :is-index true."
-  [{:keys [config pages-to-render] :as ctx}]
-  (let [;; Get the index page from config
-        index-page (:index config)
+    [{:keys [config pages-to-render] :as ctx}]
+    (let [;; Get the index page from config
+          index-page (:index config)
         ;; Get all configured languages
-        lang-codes (keys (:lang config))
+          lang-codes (keys (:lang config))
         ;; Create a page spec for each page × language combination
-        page-specs (for [content-key pages-to-render
-                         lang-code lang-codes]
-                     {:content-key content-key
-                      :lang-code lang-code
-                      :is-index (= content-key index-page)})]
-    (assoc ctx :pages page-specs)))
+          page-specs (for [content-key pages-to-render
+                           lang-code lang-codes]
+                       {:content-key content-key
+                        :lang-code lang-code
+                        :is-index (= content-key index-page)})]
+      (assoc ctx :pages page-specs)))
 
-(defn- load-page-content
-  "Load content for a specific page/language combination from pre-loaded content"
-  [{:keys [content]} page]
-  (let [lang-code (:lang-code page)
-        content-key (:content-key page)
-        ;; Get content from pre-loaded data
-        page-content (get-in content [lang-code content-key])
-        ;; Extract slug from content or use content-name as fallback
-        slug (or (:slug page-content)
-                 (name content-key))]
-    (if page-content
-      (assoc page
-             :content page-content
-             :slug slug)
-      ;; No content found
-      (do
-        (println (str "WARNING: No content for " content-key " in " lang-code))
-        page))))
-
-(defn- load-all-content
-  "Load content for all pages"
-  [{:keys [pages] :as ctx}]
-  (assoc ctx :pages (map #(load-page-content ctx %) pages)))
-
-(defn- process-page-content
-  "Process page content and add language info"
-  [{:keys [default-lang]} page]
-  (if-let [content (:content page)]
+#_(defn- load-page-content
+    "Load content for a specific page/language combination from pre-loaded content"
+    [{:keys [content]} page]
     (let [lang-code (:lang-code page)
-          processed (assoc content
-                           :lang lang-code
-                           :lang-prefix (if (= lang-code default-lang) "" (str "/" (name lang-code))))]
-      (assoc page :content processed))
-    page))
+          content-key (:content-key page)
+        ;; Get content from pre-loaded data
+          page-content (get-in content [lang-code content-key])
+        ;; Extract slug from content or use content-name as fallback
+          slug (or (:slug page-content)
+                   (name content-key))]
+      (if page-content
+        (assoc page
+               :content page-content
+               :slug slug)
+      ;; No content found
+        (do
+          (println (str "WARNING: No content for " content-key " in " lang-code))
+          page))))
 
-(defn- process-all-content
-  "Process content for all pages"
-  [{:keys [pages default-lang] :as ctx}]
-  (assoc ctx :pages (map #(process-page-content {:default-lang default-lang} %) pages)))
+#_(defn- load-all-content
+    "Load content for all pages"
+    [{:keys [pages] :as ctx}]
+    (assoc ctx :pages (map #(load-page-content ctx %) pages)))
 
-(defn- calculate-page-path
-  "Calculate final URL path (without file extension)"
-  [{:keys [default-lang]} page]
-  (let [{:keys [lang-code is-index slug output-path]} page
+#_(defn- process-page-content
+    "Process page content and add language info"
+    [{:keys [default-lang]} page]
+    (if-let [content (:content page)]
+      (let [lang-code (:lang-code page)
+            processed (assoc content
+                             :lang lang-code
+                             :lang-prefix (if (= lang-code default-lang) "" (str "/" (name lang-code))))]
+        (assoc page :content processed))
+      page))
+
+#_(defn- process-all-content
+    "Process content for all pages"
+    [{:keys [pages default-lang] :as ctx}]
+    (assoc ctx :pages (map #(process-page-content {:default-lang default-lang} %) pages)))
+
+#_(defn- calculate-page-path
+    "Calculate final URL path (without file extension)"
+    [{:keys [default-lang]} page]
+    (let [{:keys [lang-code is-index slug output-path]} page
         ;; Determine base path (no .html extension)
-        base-path (cond
-                    is-index "/"
-                    output-path output-path ; Explicit path from old format
-                    slug (str "/" slug)
-                    :else (str "/" (name (:content-key page)))) ; Fallback
+          base-path (cond
+                      is-index "/"
+                      output-path output-path ; Explicit path from old format
+                      slug (str "/" slug)
+                      :else (str "/" (name (:content-key page)))) ; Fallback
         ;; Add language prefix for non-default languages
         ;; Only skip prefix if BOTH: default language AND (index OR regular page)
-        final-path (if (= lang-code default-lang)
-                     base-path
-                     (str "/" (name lang-code) base-path))]
-    (assoc page :path final-path)))
+          final-path (if (= lang-code default-lang)
+                       base-path
+                       (str "/" (name lang-code) base-path))]
+      (assoc page :path final-path)))
 
-(defn- calculate-all-paths
-  "Calculate paths for all pages"
-  [{:keys [pages default-lang] :as ctx}]
-  (assoc ctx :pages (map #(calculate-page-path {:default-lang default-lang} %) pages)))
+#_(defn- calculate-all-paths
+    "Calculate paths for all pages"
+    [{:keys [pages default-lang] :as ctx}]
+    (assoc ctx :pages (map #(calculate-page-path {:default-lang default-lang} %) pages)))
 
-(defn build-site
-  "Build static site using dependency-driven rendering.
+#_(defn build-site
+    "Build static site using dependency-driven rendering.
    
    Data map should contain:
      :config - Site configuration with :render-roots
@@ -145,36 +148,36 @@
      :content - All loaded content organized by language
    
    Returns map with :html-files and :warnings"
-  [{:keys [config templates] :as ctx} _opts]
+    [{:keys [config templates] :as ctx} _opts]
   ;; Validate wrapper template exists
-  (when-not (get templates (:wrapper config))
-    (throw (ex-info (str "Wrapper template '" (:wrapper config) "' not found")
-                    {:wrapper (:wrapper config)
-                     :available (keys templates)})))
+    (when-not (get templates (:wrapper config))
+      (throw (ex-info (str "Wrapper template '" (:wrapper config) "' not found")
+                      {:wrapper (:wrapper config)
+                       :available (keys templates)})))
 
   ;; Get render-roots from config
-  (let [render-roots (or (:render-roots config)
-                         #{(:index config)}) ; Fallback to just index if nothing specified
+    (let [render-roots (or (:render-roots config)
+                           #{(:index config)}) ; Fallback to just index if nothing specified
 
         ;; Phase 1: Analyze - expand templates, scan sections, collect dependencies
-        analyzed-ctx (-> (renderer/expand-all-templates ctx)
-                         (renderer/scan-for-sections))
-        deps-result (renderer/collect-dependencies-and-pages
-                     (assoc analyzed-ctx :render-roots render-roots))
+          analyzed-ctx (-> (renderer/expand-all-templates ctx)
+                           (renderer/scan-for-sections))
+          deps-result (renderer/collect-dependencies-and-pages
+                       (assoc analyzed-ctx :render-roots render-roots))
 
         ;; Build pipeline with analyzed context
-        result (-> analyzed-ctx
-                   (assoc :pages-to-render (:pages-to-render deps-result))
-                   create-page-specs
-                   load-all-content
-                   (update :pages validate-pages)
-                   process-all-content
-                   calculate-all-paths
-                   (renderer/render-all-pages))]
-    {:html-files (->> (:pages result)
-                      (filter :html)
-                      (map #(select-keys % [:path :html :slug :lang-code :content-key])))
-     :warnings (:warnings result)}))
+          result (-> analyzed-ctx
+                     (assoc :pages-to-render (:pages-to-render deps-result))
+                     create-page-specs
+                     load-all-content
+                     (update :pages validate-pages)
+                     process-all-content
+                     calculate-all-paths
+                     (renderer/render-all-pages))]
+      {:html-files (->> (:pages result)
+                        (filter :html)
+                        (map #(select-keys % [:path :html :slug :lang-code :content-key])))
+       :warnings (:warnings result)}))
 
 (defn resolve-links
   "Post-process rendered pages to resolve link placeholders and convert to HTML"
@@ -225,6 +228,26 @@
                                                       :to content-key})
                            (str "#broken-link-" (name content-key)))))
 
+        ;; Resolve navigation helpers (parent, root)
+        resolve-nav (fn [nav-type current-page-id lang-code]
+                      (case nav-type
+                        :parent
+                        (let [path (if (= current-page-id (:index (:config ctx)))
+                                     []
+                                     (mapv keyword (str/split (name current-page-id) #"\.")))]
+                          (cond
+                            (empty? path) "#no-parent"
+                            (= 1 (count path)) "/"
+                            :else
+                            (let [parent-id (if (= 2 (count path))
+                                              (first path)
+                                              (keyword (str/join "." (map name (butlast path)))))]
+                              (make-url parent-id lang-code))))
+
+                        :root "/"
+
+                        "#unknown-nav"))
+
         ;; Process a single page's hiccup to resolve placeholders
         process-page (fn [page]
                        (let [lang-code (:lang-code page)
@@ -239,7 +262,7 @@
                                                 (resolve-link (:content-key node) current-page-id lang-code)
 
                                                 (:nav node)
-                                                "#nav-placeholder" ; TODO: implement nav resolution
+                                                (resolve-nav (:nav node) current-page-id lang-code)
 
                                                 (:lang node)
                                                 (make-url current-page-id (:lang node))
@@ -278,6 +301,32 @@
                              results))))
         (assoc :warnings @warnings-atom))))
 
+(defn format-build-output
+  "Transform build-site-new output to match expected shape for write-output"
+  [{:keys [config]} {:keys [results warnings] :as _state}]
+
+  (let [default-lang (config/find-default-language config)
+        ;; Flatten the nested structure and add paths
+        html-files (for [[page-id pages] results
+                         page pages
+                         :when (:html page)]
+                     (let [lang-code (:lang-code page)
+                           is-index (= page-id (:index config))
+                           ;; Calculate URL path
+                           base-path (cond
+                                       is-index "/"
+                                       ;; Use content-key structure for nested paths
+                                       :else (str "/" (str/replace (name page-id) "." "/")))
+                           path (if (= lang-code default-lang)
+                                  base-path
+                                  (str "/" (name lang-code) base-path))]
+                       (-> page
+                           (assoc :path path)
+                           (update :html (fn [hiccup] (str "<!DOCTYPE html>" (rs/render hiccup)))))))]
+    {:html-files (map #(select-keys % [:path :html :slug :lang-code :content-key])
+                      html-files)
+     :warnings warnings}))
+
 (defn build-site-new
   "New simplified rendering pipeline using dynamic discovery"
   [{:keys [config] :as ctx}]
@@ -287,7 +336,8 @@
                   :results {}
                   :sections {}
                   :references {}
-                  :warnings []}]
+                  :warnings []
+                  :config config}]
       (if-let [page-id (peek render-queue)]
         (let [references (atom #{})
               sections (atom {})
@@ -296,7 +346,6 @@
                              :add-reference! #(do (swap! references conj %) nil)
                              :add-section! #(do (swap! sections assoc %1 %2) nil)
                              :warn! #(do (swap! warnings conj %) nil))
-              ;; TODO: implement render-page-new that uses the context callbacks
               result (renderer/render-page-new context page-id)
               ;; Add newly discovered references to queue
               updated-queue (into (pop render-queue) (remove (:attempted state) @references))]
@@ -307,8 +356,10 @@
                      (update :sections merge @sections)
                      (update :references assoc page-id @references)
                      (update :warnings into @warnings))))
-        ;; Queue empty - post-process to resolve link placeholders
-        (resolve-links ctx state)))))
+        ;; Queue empty - post-process to resolve link placeholders and format output
+        (->> state
+             (resolve-links ctx)
+             (format-build-output ctx))))))
 
 (defn write-output
   "Write HTML files to disk using the url->filepath strategy."
