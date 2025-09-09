@@ -69,7 +69,7 @@
                     })
             [:span.missing-content (str "[:eden/get " processed-key "]")]))
 
-      (= processed-key :html/raw)
+      (= processed-key :html/content)
       [:span {:innerHTML value}]
 
       :else value)))
@@ -87,7 +87,7 @@
                     :path processed-path})
             [:span.missing-content (str "[:eden/get-in " processed-path "]")]))
 
-      (= (last processed-path) :html/raw)
+      (= (last processed-path) :html/content)
       [:span {:innerHTML value}]
 
       :else value)))

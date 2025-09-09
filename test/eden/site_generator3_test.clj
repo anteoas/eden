@@ -40,8 +40,8 @@
 
   (testing "raw html"
     (is (= [:span {:innerHTML "<p>hello</p>"}]
-           (sg/process [:eden/get :html/raw]
-                       {:data {:html/raw "<p>hello</p>"}})))))
+           (sg/process [:eden/get :html/content]
+                       {:data {:html/content "<p>hello</p>"}})))))
 
 (deftest eden-if
   (testing "branches"
@@ -143,7 +143,7 @@
                          :where {:published true}
                          :order-by [:date :asc]
                          :limit 2
-                         [:article 
+                         [:article
                           [:h2 [:eden/get :title]]
                           [:p "Posted on" [:eden/get :date]]]]]
                        {:data {:posts [{:title "fourth" :date "2025-08-04" :published true}
@@ -159,7 +159,7 @@
                            :where {:published true}
                            :order-by [:date :desc]
                            :limit 2
-                           [:article 
+                           [:article
                             [:h2 [:eden/get :title]]
                             [:p "Posted on" [:eden/get :date]]]]]
                          {:data {:posts [{:title "fourth" :date "2025-08-04" :published true}
@@ -169,7 +169,7 @@
 
   (testing "map iteration"
     (is (= [:dl [:dt :foo] [:dd 1] [:dt :bar] [:dd 2]]
-           (sg/process [:dl 
+           (sg/process [:dl
                         [:eden/each :metadata
                          [:dt [:eden/get :eden.each/key]]
                          [:dd [:eden/get :eden.each/value]]]]
@@ -349,7 +349,7 @@
                                                     :language "braile"}}}}))))
 
   (testing "missing key"
-    (let [warnings (atom [])] 
+    (let [warnings (atom [])]
       (is (= [[:p [:span.missing-content "[:eden/get :value]"]]]
              (sg/process [:eden/with :foo
                           [:p [:eden/get :value]]]
@@ -415,7 +415,7 @@
 
   (testing "single element-path (equivalent to :eden/get"
     (let [context {:data {:value 42}}]
-      (is (= 42 
+      (is (= 42
              (sg/process [:eden/get-in [:value]] context)
              (sg/process [:eden/get :value] context))))))
 
