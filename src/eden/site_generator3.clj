@@ -380,28 +380,15 @@
     (eden-directive? elem)
     (process-directive elem context)
 
-    (hiccup? elem)
-    (let [[tag & content] elem
-          attrs (when (and (seq content) (map? (first content)))
-                  (first content))
-          children (if attrs (rest content) content)
-          processed-attrs (into {} (map (fn [[k v]]
-                                          [k (process v context)])
-                                        attrs))
-          processed-children (mapcat (fn [child]
-                                       (let [result (process child context)]
-                                         (if (vector-of-vectors? result)
-                                           ;; returned multiple elements, flatten
-                                           result
-                                           ;; don't flatten
-                                           [result])))
-                                     children)]
-      (into [] (concat [tag]
-                       (when attrs [processed-attrs])
-                       processed-children)))
-
     (sequential? elem)
-    (into [] (map #(process % context)) elem)
+    (into [] (mapcat (fn [e]
+                       (let [result (process e context)]
+                         (if (vector-of-vectors? result)
+                           ;; returned multiple elements, flatten
+                           result
+                           ;; don't flatten
+                           [result]))
+                       )) elem)
 
     (map? elem)
     (into {}
