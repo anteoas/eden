@@ -75,7 +75,7 @@
                      :mode mode
                      :warnings {}
                      :timings {}
-                     :results {}}
+                     :results []}
         final-ctx (-> initial-ctx
                       (pipeline/run-step pipeline/load-step :load)
                       (pipeline/run-step pipeline/build-html-step :build-html)

@@ -235,11 +235,11 @@
     (when (and content-key (not nav))
       (add-reference! context content-key))
 
-    (let [link-context (assoc context :data
-                              (cond-> (assoc (:data context)
-                                             :link/href (assoc final-spec :type :eden.link.placeholder/href)
-                                             :link/title (assoc final-spec :type :eden.link.placeholder/title))
-                                lang (assoc :current-lang lang)))]
+    (let [link-element-context (assoc final-spec :lang (or lang (:lang context)))
+          link-context (assoc context :data
+                              (assoc (:data context)
+                                     :link/href (assoc link-element-context :type :eden.link.placeholder/href)
+                                     :link/title (assoc link-element-context :type :eden.link.placeholder/title)))]
       (process body link-context))))
 
 (defmethod process-directive :eden/render [[_ render-spec] context]

@@ -177,7 +177,7 @@
 
 (defn load-site-data
   "Load site configuration and templates"
-  [site-edn-path output-dir]
+  [& {:keys [site-edn-path output-dir]}]
   (let [site-edn-file (io/file site-edn-path)
         _ (when-not (.exists site-edn-file)
             (throw (ex-info "Site EDN file not found" {:path site-edn-path})))
@@ -211,8 +211,8 @@
      :content (load-all-content-files site-root (or (:content site-config) "content"))
      :strings strings
      :build-constants build-constants
-     :url->filepath url->filepath
-     :page->url page->url}))
+     :fns {:url->filepath url->filepath
+           :page->url page->url}}))
 
 
 

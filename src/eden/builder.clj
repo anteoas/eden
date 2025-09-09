@@ -47,22 +47,22 @@
 
 #_(defn- create-page-specs
     "Create page specifications for each page that needs to be built.
-   
+
    A 'page spec' is a map describing a single HTML page to be generated, containing:
    - :content-key - The page identifier (e.g., :landing, :about, :products.logistics)
    - :lang-code   - The language for this page (e.g., :no, :en)
    - :is-index    - Whether this is the index/home page
-   
+
    This function takes the set of pages that need to be rendered (from dependency
    collection) and expands it into individual page specs for each language combination.
-   
+
    For example, if :pages-to-render contains #{:landing :about} and we have languages
    {:no {:default true} :en {}}, this creates 4 page specs:
    - {:content-key :landing :lang-code :no :is-index true}
    - {:content-key :landing :lang-code :en :is-index true}
    - {:content-key :about :lang-code :no :is-index false}
    - {:content-key :about :lang-code :en :is-index false}
-   
+
    The index page (specified in config) gets special treatment with :is-index true."
     [{:keys [config pages-to-render] :as ctx}]
     (let [;; Get the index page from config
@@ -141,12 +141,12 @@
 
 #_(defn build-site
     "Build static site using dependency-driven rendering.
-   
+
    Data map should contain:
      :config - Site configuration with :render-roots
      :templates - Map of template-name -> template data/fn
      :content - All loaded content organized by language
-   
+
    Returns map with :html-files and :warnings"
     [{:keys [config templates] :as ctx} _opts]
   ;; Validate wrapper template exists
@@ -179,7 +179,7 @@
                         (map #(select-keys % [:path :html :slug :lang-code :content-key])))
        :warnings (:warnings result)}))
 
-(defn resolve-links
+#_(defn resolve-links
   "Post-process rendered pages to resolve link placeholders and convert to HTML"
   [ctx {:keys [results sections warnings] :as state}]
   (let [;; Helper to generate URL for a page
@@ -301,43 +301,77 @@
                              results))))
         (assoc :warnings @warnings-atom))))
 
+(defn resolve-link
+  ([ctx page-content]
+   (resolve-link ctx page-content nil))
+  ([{:keys [site-config] :as _ctx}
+    {:keys [content-key slug] :as page-content}
+    {:keys [] :as link}]
+   ;; TODO: sections, nav
+   (let [default-lang (config/find-default-language site-config)
+         strategy (or (:page-url-strategy site-config) :default)
+         lang (or (:lang link) (:lang page-content) default-lang)
+         is-index? (= content-key (:index site-config))
+         parts (str/split (name content-key) #"\.")
+         base-path (if is-index?
+                     "/"
+                     (str "/" (str/join "/" (conj (or (butlast parts) [])
+                                                  (or slug (last parts) )))))
+         lang-path (if (= lang default-lang)
+                     base-path
+                     (str "/" (name lang) base-path))
+         path (case strategy
+                :with-extension (if is-index?
+                                  lang-path
+                                  (str lang-path ".html"))
+                :default lang-path)]
+     path)))
+
+(defn resolve-links [ctx state]
+  ;; TODO: sections
+  (update state :rendered
+          (fn [rendered]
+            (into []
+                  (map (fn [page-content]
+                         (update
+                          page-content
+                          :rendered/page
+                          (fn [page]
+                            (walk/prewalk
+                             (fn [elem]
+                               (cond (and (map? elem)
+                                          (contains? elem :type)
+                                          (= "eden.link.placeholder" (namespace (:type elem))))
+                                     (case (:type elem)
+                                       :eden.link.placeholder/href (resolve-link ctx page-content elem)
+                                       :eden.link.placeholder/title "TODO")
+                                     :else elem))
+                             page)))))
+                  rendered))))
+
 (defn format-build-output
   "Transform build-site-new output to match expected shape for write-output"
-  [{:keys [config]} {:keys [results warnings] :as _state}]
+  [ctx state]
+  (update state :rendered
+          (fn [rendered]
+            (into []
+                  (map (fn [{:keys [rendered/page] :as page-content}]
+                         (assoc page-content
+                                :path (resolve-link ctx page-content)
+                                :html/output (str "<!DOCTYPE html>" (rs/render page)))))
+                  rendered))))
 
-  (let [default-lang (config/find-default-language config)
-        ;; Flatten the nested structure and add paths
-        html-files (for [[page-id pages] results
-                         page pages
-                         :when (:html page)]
-                     (let [lang-code (:lang-code page)
-                           is-index (= page-id (:index config))
-                           ;; Calculate URL path
-                           base-path (cond
-                                       is-index "/"
-                                       ;; Use content-key structure for nested paths
-                                       :else (str "/" (str/replace (name page-id) "." "/")))
-                           path (if (= lang-code default-lang)
-                                  base-path
-                                  (str "/" (name lang-code) base-path))]
-                       (-> page
-                           (assoc :path path)
-                           (update :html (fn [hiccup] (str "<!DOCTYPE html>" (rs/render hiccup)))))))]
-    {:html-files (map #(select-keys % [:path :html :slug :lang-code :content-key])
-                      html-files)
-     :warnings warnings}))
-
-(defn build-site-new
-  "New simplified rendering pipeline using dynamic discovery"
-  [{:keys [config] :as ctx}]
-  (let [initial-queue (into clojure.lang.PersistentQueue/EMPTY (:render-roots config))]
+(defn build-site
+  "build-site"
+  [{:keys [site-config] :as ctx}]
+  (let [initial-queue (into clojure.lang.PersistentQueue/EMPTY (:render-roots site-config))]
     (loop [render-queue initial-queue
            state {:attempted #{}
-                  :results {}
+                  :rendered []
                   :sections {}
                   :references {}
                   :warnings []
-                  :config config}]
+                  :site-config site-config}]
       (if-let [page-id (peek render-queue)]
         (let [references (atom #{})
               sections (atom {})
@@ -346,13 +380,18 @@
                              :add-reference! #(do (swap! references conj %) nil)
                              :add-section! #(do (swap! sections assoc %1 %2) nil)
                              :warn! #(do (swap! warnings conj %) nil))
-              result (renderer/render-page-new context page-id)
+              rendered (renderer/render-page context page-id)
+
+              ;; Pages that we have already attempted to render or are already queued
+              attempted-or-in-queue (into #{} (concat (:attempted state) render-queue))
+
               ;; Add newly discovered references to queue
-              updated-queue (into (pop render-queue) (remove (:attempted state) @references))]
+              updated-queue (into (pop render-queue) (remove attempted-or-in-queue @references))]
+
           (recur updated-queue
                  (-> state
                      (update :attempted conj page-id)
-                     (update :results assoc page-id result)
+                     (update :rendered into rendered)
                      (update :sections merge @sections)
                      (update :references assoc page-id @references)
                      (update :warnings into @warnings))))
@@ -363,17 +402,18 @@
 
 (defn write-output
   "Write HTML files to disk using the url->filepath strategy."
-  [html-files output-dir url->filepath]
-  (doseq [{:keys [path html lang-code content-key] :as page} html-files]
+  [{:keys [rendered]
+    {:keys [url->filepath]} :fns
+    {:keys [output-path]} :site-config}]
+  (doseq [{:keys [path html/output lang content-key] :as page} rendered]
     (let [;; Build the input map for url->filepath
           page-data {:path path
                      :page {:content-key content-key
-                            :lang-code lang-code
+                            :lang-code lang
                             :slug (:slug page)}
-                     :lang lang-code}
+                     :lang lang}
           ;; Get the filepath from the strategy function
           filepath (url->filepath page-data)
-          output-file (io/file output-dir filepath)]
+          output-file (io/file output-path filepath)]
       (io/make-parents output-file)
-      (spit output-file html)))
-  (println (format "  Wrote %d HTML files" (count html-files))))
+      (spit output-file output))))

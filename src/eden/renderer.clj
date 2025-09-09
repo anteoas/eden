@@ -3,7 +3,7 @@
             [clojure.string :as str]
             [clojure.set :as set]
             [clojure.walk :as walk]
-            [eden.site-generator :as sg]
+            [eden.site-generator3 :as sg]
             [eden.loader :as loader]))
 
 #_(defn scan-for-sections
@@ -308,12 +308,12 @@
           (swap! messages conj (str "WARNING: " warning-type " - " (pr-str item))))))
     @messages))
 
-(defn render-page-new
+(defn render-page
   "Render a single page, discovering references dynamically"
-  [{:keys [config templates content strings warn!] :as ctx} page-id]
+  [{:keys [site-config templates content strings warn!] :as ctx} content-key]
   ;; Check all languages for this page
   (let [pages-by-lang (reduce (fn [acc [lang-code lang-content]]
-                                (if-let [page-content (get lang-content page-id)]
+                                (if-let [page-content (get lang-content content-key)]
                                   (assoc acc lang-code page-content)
                                   acc))
                               {}
@@ -321,51 +321,43 @@
     (if (empty? pages-by-lang)
       ;; Page doesn't exist in any language
       (warn! {:type :missing-content
-              :content-key page-id
-              :message (str "Page " page-id " not found in any language")})
+              :content-key content-key
+              :message (str "Page " content-key " not found in any language")})
       ;; Render page for each language it exists in
-      (reduce (fn [results [lang-code page-content]]
+      (reduce (fn [results [lang page-content]]
                 (let [ ;; Determine template
-                      template-key (or (:template page-content) page-id)
+                      template-key (or (:template page-content) content-key)
                       template (get templates template-key)
-                      wrapper (get templates (:wrapper config))
+                      wrapper (get templates (:wrapper site-config))
 
                       ;; Get strings for this language
-                      lang-strings (get strings lang-code)
-                      
-                      page-data (assoc page-content
-                                       :lang lang-code)
+                      lang-strings (get strings lang)
+                      page-data (assoc page-content :lang lang)
 
                       ;; Build context for rendering
                       render-context (assoc ctx
+                                            ;; TODO: do we need :lang in :data?
                                             :data page-data
-                                            :lang lang-code
-                                            :content-key page-id
+                                            :lang lang
+                                            :content-key content-key
                                             :strings lang-strings
                                             ;; All content for languge
                                             ;; Used as source for eden/each queries
                                             ;; Should we include every language here?
-                                            :content-data (get content lang-code)
-                                            ;; Why do we rename this key?
-                                            ;; should be the same all the way
-                                            :site-config config)]
+                                            :content-data (get content lang))]
                   (if (not template)
                     (do
                       (warn! {:type :missing-template
                               :template template-key
-                              :content-key page-id
-                              :lang lang-code})
+                              :content-key content-key
+                              :lang lang})
                       results)
                     ;; Process template and wrapper
-                    (let [page-html (sg/process template render-context)
-                          wrapper-context (assoc render-context :body page-html)
-                          wrapped-html (if wrapper
-                                         (sg/process wrapper wrapper-context)
-                                         page-html)]
+                    (let [processed-template (sg/process template render-context)
+                          processed-page (if wrapper
+                                           (sg/process wrapper (assoc render-context :body processed-template))
+                                           processed-template)]
                       ;; Return page data with HTML containing placeholders
-                      (conj results 
-                            (assoc page-content
-                                   :lang-code lang-code
-                                   :html wrapped-html))))))
+                      (conj results (assoc page-data :rendered/page processed-page))))))
               []
               pages-by-lang))))

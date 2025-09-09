@@ -84,7 +84,6 @@
 (defn find-default-language
   "Find the default language and assoc it to context"
   [config]
-  (let [lang-config (:lang config)
-        default-lang (or (some (fn [[code cfg]] (when (:default cfg) code)) lang-config)
-                         (first (keys lang-config)))]
-    default-lang))
+  (let [lang-config (:lang config)]
+    (or (some (fn [[code cfg]] (when (:default cfg) code)) lang-config)
+        (first (keys lang-config)))))
