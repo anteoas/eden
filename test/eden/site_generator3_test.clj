@@ -419,6 +419,33 @@
              (sg/process [:eden/get-in [:value]] context)
              (sg/process [:eden/get :value] context))))))
 
+
+(deftest eden-t
+  (testing "simple translation"
+    (is (= "Home" (sg/process [:eden/t :nav/home]
+                              {:strings {:nav/home "Home"}}))))
+
+  (testing "with default"
+    (is (= "Coming Soon" (sg/process [:eden/t :new-feature "Coming Soon"] {}))))
+
+  (testing "with interpolation"
+    (is (= "Hello, Alice" (sg/process [:eden/t :greeting {:name [:eden/get :username]}]
+                                      {:data {:username "Alice"}
+                                       :strings {:greeting "Hello, {{name}}"}}))))
+
+  (testing "nested keys"
+    (is (= "Not found" (sg/process [:eden/t [:errors :not-found]]
+                                   {:strings {:errors {:not-found "Not found"}}}))))
+
+  (testing "multiple interpolations"
+    (is (= "Status: Shipped, on 2025-01-01"
+           (sg/process [:eden/t :order-status
+                        {:status [:eden/get :status]
+                         :date [:eden/get :date]}]
+                       {:data {:status "Shipped"
+                               :date "2025-01-01"}
+                        :strings {:order-status "Status: {{status}}, on {{date}}"}})))))
+
 (deftest missing-directive
   (testing "nonexistent"
     (is (= [:span.unknown-directive "[:eden/not-real-directive ...]"]

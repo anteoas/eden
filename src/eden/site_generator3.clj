@@ -1,4 +1,5 @@
-(ns eden.site-generator3)
+(ns eden.site-generator3
+  (:require [clojure.string :as str]))
 
 (defn- hiccup?
   [elem]
@@ -130,7 +131,7 @@
                            (mapv (fn [[id data]]
                                    (assoc data :content-key id))
                                  content-data))
-                         
+
                          (keyword? processed-collection-spec)
                          (let [result (get-in context [:data processed-collection-spec])]
                            (if result
@@ -141,7 +142,7 @@
 
                          (coll? processed-collection-spec)
                          processed-collection-spec
-                         
+
                          :else
                          (warn! context
                                 {:type :unsupported-eden-each-collection-spec
@@ -152,7 +153,7 @@
 
         collection (if (and where (sequential? raw-collection))
                      (filterv (fn [item]
-                                (every? (fn [[k v]] 
+                                (every? (fn [[k v]]
                                           (= (get item k) v))
                                         where))
                               raw-collection)
@@ -212,8 +213,8 @@
                      (sort comparator collection)
                      collection)]
         (into [] (comp (map-indexed (fn [idx item]
-                                      (let [item-context (update context :data 
-                                                                 merge 
+                                      (let [item-context (update context :data
+                                                                 merge
                                                                  (if (map? item) item {:eden.each/value item})
                                                                  {:eden.each/index idx})]
                                         (process template item-context))))
@@ -246,7 +247,7 @@
         final-spec (if (keyword? processed-render-spec)
                      {:data processed-render-spec}
                      processed-render-spec)
-        
+
         page-id (:data final-spec)
 
         lang (or (:lang context)
@@ -316,6 +317,49 @@
                     :content-key (:content-key context)}))
   body)
 
+(defmethod process-directive :eden/t [[_ key-or-path interpolations-or-default-value] context]
+  (let [processed-key-or-path (process key-or-path context)
+        final-path (cond
+                     (keyword? processed-key-or-path)
+                     [processed-key-or-path]
+
+                     (sequential? processed-key-or-path)
+                     processed-key-or-path
+
+                     :else (warn! context  {:type :invalid-key-or-path
+                                            :path processed-key-or-path
+                                            :directive :eden/t}))
+        string-template (and final-path (get-in (:strings context) final-path))
+
+        interpolations (when (map? interpolations-or-default-value)
+                         (process interpolations-or-default-value context))
+
+        default-value (when (string? interpolations-or-default-value)
+                        interpolations-or-default-value)
+
+        mappings (->> (re-seq #"\{\{([^\}]+)\}\}" (or string-template ""))
+                      (map #(update % 1 (fn [value]
+                                          (try
+                                            (let [k (keyword value)]
+                                              (get interpolations k))
+                                            (catch Exception _))))))
+
+        translated-string (and string-template
+                               (reduce (fn [s [variable value]]
+                                         (if (string? value)
+                                           (str/replace s variable value)
+                                           (do (warn! context {:type :not-a-string
+                                                               :directive :eden/t
+                                                               :value value
+                                                               :template-variable variable
+                                                               :template-string string-template
+                                                               :form [:eden/t key-or-path interpolations-or-default-value]})
+                                               s)))
+                                       string-template mappings))]
+
+    (or translated-string
+        default-value
+        [:span.missing-content (str "[:eden/t " processed-key-or-path "]" )])))
 
 (defmethod process-directive :default [[directive & _] context]
   ;; magic values
@@ -359,5 +403,11 @@
     (sequential? elem)
     (into [] (map #(process % context)) elem)
 
-    :else elem))
+    (map? elem)
+    (into {}
+          (map (fn [[k v]]
+                 [(process k context)
+                  (process v context)]))
+          elem)
 
+    :else elem))
