@@ -1,6 +1,5 @@
 (ns eden.pipeline
   (:require [clojure.java.io :as io]
-            [clojure.string :as str]
             [babashka.fs :as fs]
             [eden.loader :as loader]
             [eden.builder :as builder]
@@ -8,8 +7,8 @@
   (:import [java.io File]))
 
 ;; TODO: validate params
-(defn init-context [& {:keys [site-edn-path output-dir mode]}]
-  {:site-edn-path site-edn-path
+(defn init-context [& {:keys [site-edn output-dir mode]}]
+  {:site-edn site-edn
    :output-dir output-dir
    :mode mode
    :timings []})
@@ -103,10 +102,9 @@
 (defn write-output-step
   "Write HTML files to disk"
   [ctx]
-  (user/capture-env)
-  (tap> ctx)
   (builder/write-output ctx))
 
+;; TODO: merge into process-images-step?
 (defn copy-processed-images-step
   "Copy processed images from temp to dist"
   [ctx]

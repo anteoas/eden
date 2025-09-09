@@ -177,10 +177,10 @@
 
 (defn load-site-data
   "Load site configuration and templates"
-  [& {:keys [site-edn-path output-dir]}]
-  (let [site-edn-file (io/file site-edn-path)
+  [& {:keys [site-edn output-dir]}]
+  (let [site-edn-file (io/file site-edn)
         _ (when-not (.exists site-edn-file)
-            (throw (ex-info "Site EDN file not found" {:path site-edn-path})))
+            (throw (ex-info "Site EDN file not found" {:path site-edn})))
         site-config (edn/read-string (slurp site-edn-file))
         ;; All paths are resolved relative to site.edn location
         ;; If site.edn has no parent (in current dir), use current dir

@@ -7,7 +7,7 @@
             [eden.report :as report]
             [eden.mcp :as mcp]
             [eden.loader :as loader]
-            [eden.pipeline :as pipeline]
+            [eden.pipeline :refer [|>] :as pipeline]
             [eden.init :as init])
   (:import [java.io File]))
 
@@ -70,23 +70,21 @@
 
   (println "Build mode:" mode)
 
-  (let [initial-ctx {:site-edn site-edn
-                     :output-dir (or output-dir "dist")
-                     :mode mode
-                     :warnings {}
-                     :timings {}
-                     :results []}
-        final-ctx (-> initial-ctx
-                      (pipeline/run-step pipeline/load-step :load)
-                      (pipeline/run-step pipeline/build-html-step :build-html)
-                      (pipeline/run-step pipeline/process-images-step :process-images)
-                      (pipeline/run-step pipeline/bundle-assets-step :bundle-assets)
-                      (pipeline/run-step pipeline/copy-static-step :copy-static)
-                      (pipeline/run-step pipeline/write-output-step :write-output)
-                      (pipeline/run-step pipeline/copy-processed-images-step :copy-processed-images))]
+  (let [result (|> {:site-edn site-edn
+                    :output-dir (or output-dir "dist")
+                    :mode mode}
+                 pipeline/load-step
+                 pipeline/build-step
+                 pipeline/process-images-step
+                 pipeline/bundle-assets-step
+                 pipeline/copy-static-step
+                 pipeline/write-output-step
+                 ;; pipeline/copy-processed-images-step ;; TODO
+                 )]
 
-    (report/print-build-report final-ctx)
-    (report/generate-html-report final-ctx)
+    ;; TODO: reports
+    ;; (report/print-build-report result)
+    ;; (report/generate-html-report result)
     (println "\nBuild complete!")))
 
 (defn- start-watch
