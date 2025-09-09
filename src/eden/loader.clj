@@ -8,32 +8,35 @@
             [eden.config :as config])
   (:import [java.io File]))
 
+#_(set! *warn-on-reflection* true)
+
 (defn load-template
   "Load a single template file. Returns template data or function."
-  [template-file]
-  (let [path (.getPath template-file)]
+  [^File template-file]
+  (let [path (File/.getPath template-file)]
     (cond
       (str/ends-with? path ".edn")
       (edn/read-string (slurp template-file))
 
       (str/ends-with? path ".clj")
-      (let [code (slurp template-file)]
-        (sci/eval-string code {:namespaces {'clojure.string {:as 'str}}}))
+      (sci/eval-string
+       (slurp template-file)
+       {:namespaces {'clojure.string {:as 'str}}})
 
       :else nil)))
 
 (defn load-templates
   "Load all templates from a directory"
-  [templates-dir]
+  [^File templates-dir]
   (when (.exists templates-dir)
-    (into {}
-          (map (fn [file]
-                 (let [name (-> (.getName file)
-                                (str/replace #"\.(edn|clj)$" "")
-                                keyword)]
-                   [name (load-template file)]))
-               (filter #(re-matches #".*\.(edn|clj)$" (.getName %))
-                       (file-seq templates-dir))))))
+    (->> (file-seq templates-dir)
+         (filter #(re-matches #".*\.(edn|clj)$" (File/.getName %)))
+         (map (fn [file]
+                (let [name (-> (File/.getName file)
+                               (str/replace #"\.(edn|clj)$" "")
+                               keyword)]
+                  [name (load-template file)])))
+         (into {}))))
 
 (defn parse-markdown
   "Parse markdown file with metadata. Supports two formats:
@@ -41,8 +44,7 @@
    2. Legacy format: key: value lines at start
    Returns map with metadata and :markdown/content."
   [content]
-  (let [trimmed (str/trim content)
-        lines (str/split-lines content)]
+  (let [trimmed (str/trim content)]
     (cond
       ;; Empty or whitespace only
       (str/blank? trimmed)
@@ -76,35 +78,8 @@
                :eden/parse-warning (str "Invalid EDN frontmatter: " (.getMessage e))})))
         ;; No divider but starts with EDN-like syntax - treat as content
         {:markdown/content content})
-
-      ;; Legacy format - key: value lines  
-      (and (seq lines) (re-matches #"^[^:]+:.*" (first lines)))
-      (let [metadata-lines (take-while #(re-matches #"^[^:]+:.*" %) lines)
-            content-start (+ (count metadata-lines)
-                             (if (and (< (count metadata-lines) (count lines))
-                                      (str/blank? (nth lines (count metadata-lines))))
-                               1 0))
-            content-lines (drop content-start lines)
-
-            metadata (reduce (fn [m line]
-                               (let [[_ k v] (re-matches #"^([^:]+):\s*(.*)$" line)]
-                                 (if k
-                                   (assoc m (keyword (str/trim k)) (str/trim v))
-                                   m)))
-                             {}
-                             metadata-lines)]
-        (assoc metadata :markdown/content (str/join "\n" content-lines)))
-
-      ;; No metadata - just content
       :else
       {:markdown/content content})))
-
-(defn format-frontmatter
-  "Format EDN frontmatter and content back into markdown format."
-  [frontmatter content]
-  (str (pr-str frontmatter)
-       "\n---\n"
-       content))
 
 (defn- load-content-file
   "Load a single content file and convert markdown to HTML."
@@ -119,8 +94,7 @@
         ;; Convert markdown to HTML immediately
         (if (:markdown/content parsed)
           (-> parsed
-              (assoc :content/html (md/md-to-html-string (:markdown/content parsed)))
-              (dissoc :markdown/content)) ; Remove raw markdown to save memory
+              (assoc :html/content (md/md-to-html-string (:markdown/content parsed))))
           parsed))
 
       :else nil)))
@@ -146,8 +120,8 @@
    {:no {:landing {...} :products.logistics {...}}
     :en {:landing {...} :about {...}}}
    Each content item includes :content-key for self-reference."
-  [root-path]
-  (let [content-dir (io/file root-path "content")]
+  [root-path content-path]
+  (let [content-dir (io/file root-path content-path)]
     (when (.exists content-dir)
       (reduce
        (fn [acc lang-dir]
@@ -185,12 +159,21 @@
   [root-path lang-code]
   (str (io/file root-path "content" (str "strings." (name lang-code) ".edn"))))
 
-(defn load-translation-strings
+(defn- load-translation-strings
   "Load translation strings for a language"
   [root-path lang-code]
   (let [file (io/file (translation-file-path root-path lang-code))]
     (when (.exists file)
       (edn/read-string (slurp file)))))
+
+
+(defn format-frontmatter
+  "Format EDN frontmatter and content back into markdown format."
+  [frontmatter content]
+  (str (pr-str frontmatter)
+       "\n---\n"
+       content))
+
 
 (defn load-site-data
   "Load site configuration and templates"
@@ -222,11 +205,18 @@
                             acc))
                         {}
                         (:lang config))]
-    {:config config
+    {:site-config config
      :default-lang (config/find-default-language config)
-     :templates (load-templates (io/file site-root "templates"))
-     :content (load-all-content-files site-root)
+     :templates (load-templates (io/file site-root (or (:templates site-config) "templates")))
+     :content (load-all-content-files site-root (or (:content site-config) "content"))
      :strings strings
      :build-constants build-constants
      :url->filepath url->filepath
      :page->url page->url}))
+
+
+
+(comment
+
+  (tap> (load-site-data "site/site.edn" nil))
+)
