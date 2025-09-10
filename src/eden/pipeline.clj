@@ -24,7 +24,9 @@
           (try
             (step-fn ctx)
             (catch Exception e
-              {:error (.getMessage e)}))
+              {:error {:ex e
+                       :message (.getMessage e)
+                       :step step-name}}))
           elapsed (- (System/currentTimeMillis) start)]
       (cond-> (merge 
                (update ctx :timings conj {:name step-name
