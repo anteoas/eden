@@ -235,7 +235,9 @@
     (when (and content-key (not nav))
       (add-reference! context content-key))
 
-    (let [link-element-context (assoc final-spec :lang (or lang (:lang context)))
+    (let [lang (or lang (:lang context))
+          link-element-context (cond-> final-spec
+                                 lang (assoc :lang lang))
           link-context (assoc context :data
                               (assoc (:data context)
                                      :link/href (assoc link-element-context :type :eden.link.placeholder/href)
