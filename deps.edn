@@ -33,7 +33,9 @@
 
  :aliases {;; Eden framework development
            :dev {:extra-paths ["dev"]
-                 :extra-deps {djblue/portal #_{:clj-kondo/ignore [:deps.edn]} {:mvn/version "RELEASE"}}}
+                 :extra-deps {djblue/portal #_{:clj-kondo/ignore [:deps.edn]} {:mvn/version "RELEASE"}}
+                 :jvm-opts ["-Djdk.attach.allowAttachSelf"
+                            "--enable-native-access=ALL-UNNAMED"]}
            :test {:extra-paths ["test"]
                   :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
                   :main-opts ["-m" "kaocha.runner"]}
