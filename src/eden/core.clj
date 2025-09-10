@@ -79,9 +79,7 @@
                  pipeline/bundle-assets-step
                  pipeline/copy-static-step
                  pipeline/write-output-step
-                 ;; pipeline/copy-processed-images-step ;; TODO
                  )]
-
     ;; TODO: reports
     ;; (report/print-build-report result)
     ;; (report/generate-html-report result)
@@ -130,9 +128,10 @@
     (println "File watcher started.")
 
     ;; Start dev server - use absolute output path from site config
-    (let [site-data (loader/load-site-data site-edn output-dir)
-          output-path (:output-path (:config site-data))
+    (let [{:keys [site-config]} (|> {:site-edn site-edn :output-dir output-dir :mode :dev} pipeline/load-step)
+          output-path (:output-path site-config)
           proc (start-dev-server output-path)]
+
       (println "Dev server running. Press Ctrl+C to stop.")
       (try
         (Process/.waitFor proc)
