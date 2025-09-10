@@ -42,7 +42,7 @@
           steps))
 
 (defmacro |> [initial-context & steps]
-  `(pipeline* ~(init-context initial-context)
+  `(pipeline* (init-context ~initial-context)
               ~@(map (fn [step]
                        `[~(keyword step) ~step])
                      steps)))
