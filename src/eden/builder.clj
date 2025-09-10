@@ -20,7 +20,7 @@
          parts (str/split (name content-key) #"\.")
          base-path (if is-index?
                      "/"
-                     (str "/" (str/join "/" (conj (or (butlast parts) [])
+                     (str "/" (str/join "/" (conj (or (vec (butlast parts)) [])
                                                   (or slug (last parts) )))))
          lang-path (if (= lang default-lang)
                      base-path
@@ -47,9 +47,14 @@
                                (cond (and (map? elem)
                                           (contains? elem :type)
                                           (= "eden.link.placeholder" (namespace (:type elem))))
-                                     (case (:type elem)
-                                       :eden.link.placeholder/href (resolve-link ctx page-content elem)
-                                       :eden.link.placeholder/title "TODO")
+                                     (let [link-content (cond
+                                                          (and (:lang elem) (:content-key elem))
+                                                          (get-in ctx [:content (:lang elem) (:content-key elem)])
+                                                          :else
+                                                          page-content)]
+                                       (case (:type elem)
+                                         :eden.link.placeholder/href (resolve-link ctx link-content elem)
+                                         :eden.link.placeholder/title (:title link-content)))
                                      :else elem))
                              page)))))
                   rendered))))
