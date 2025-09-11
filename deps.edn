@@ -34,11 +34,11 @@
  :aliases {;; Eden framework development
            :dev {:extra-paths ["dev"]
                  :extra-deps {djblue/portal #_{:clj-kondo/ignore [:deps.edn]} {:mvn/version "RELEASE"}}
-                 :jvm-opts ["-Djdk.attach.allowAttachSelf"
-                            "--enable-native-access=ALL-UNNAMED"]}
+                 :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
            :test {:extra-paths ["test"]
                   :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
-                  :main-opts ["-m" "kaocha.runner"]}
+                  :main-opts ["-m" "kaocha.runner"]
+                  :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
            :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
                    :jvm-opts ["-Djdk.attach.allowAttachSelf"]
                    :main-opts ["-m" "nrepl.cmdline"]}
