@@ -3,37 +3,52 @@
             [clojure.string :as str]
             [clojure.walk :as walk]
             [replicant.string :as rs]
-            [eden.config :as config]
             [eden.site-generator3 :as sg]))
 
-(defn- resolve-link
-  ([ctx page-content]
-   (resolve-link ctx page-content nil))
-  ([{:keys [site-config] :as _ctx}
-    {:keys [content-key slug] :as page-content}
-    {:keys [] :as link}]
-   ;; TODO: sections, nav
-   (let [default-lang (config/find-default-language site-config)
-         strategy (or (:page-url-strategy site-config) :default)
-         lang (or (:lang link) (:lang page-content) default-lang)
-         is-index? (= content-key (:index site-config))
-         parts (str/split (name content-key) #"\.")
-         base-path (if is-index?
-                     "/"
-                     (str "/" (str/join "/" (conj (or (vec (butlast parts)) [])
-                                                  (or slug (last parts) )))))
-         lang-path (if (= lang default-lang)
-                     base-path
-                     (str "/" (name lang) base-path))
-         path (case strategy
-                :with-extension (if is-index?
-                                  lang-path
-                                  (str lang-path ".html"))
-                :default lang-path)]
-     path)))
+(defn- get-content [ctx {:keys [content-key lang]}]
+  (and lang content-key
+       (get-in ctx [:content lang content-key])))
+
+(defn- create-url [{:keys [content-key index? slug section-id lang]}]
+  (if index?
+    (str "/"
+         (when (keyword lang) (name lang))
+         (when (keyword section-id) (str "#" (name section-id))))
+
+    (let [parts (str/split (name content-key) #"\.")
+          parent (butlast parts)
+          id (when-let [base (or slug (last parts))]
+               (if (keyword? section-id)
+                 (str base "#" (name section-id))
+                 base))
+          lang-part (when (keyword? lang)
+                      [(name lang)])
+          url-parts (concat lang-part parent [id])]
+      (str "/" (str/join "/" url-parts)))))
+
+(comment
+
+  (create-url {:content-key :about ;:foo.bar.baz
+               :index? false
+               :slug "yoyo"
+               ;:lang :en
+               ;:section-id :my-section-id
+               }))
+
+(defn- resolve-link [ctx state {:keys [content-key lang] :as link}]
+  (let [section (get-in state [:sections content-key])
+        content (get-content ctx link)
+        parent-content (when section (get-content ctx (assoc link :content-key (:parent section))))
+        url-content-key (or (:content-key parent-content) content-key)
+        url-data (cond-> {:content-key url-content-key
+                          :index? (= (-> ctx :site-config :index) url-content-key)
+                          :slug (or (:slug parent-content) (:slug content))}
+                   parent-content (assoc :section-id content-key)
+                   (not= lang (:default-lang ctx)) (assoc :lang lang))]
+
+    (create-url url-data)))
 
 (defn- resolve-links [ctx state]
-  ;; TODO: sections
   (update state :rendered
           (fn [rendered]
             (into []
@@ -47,14 +62,11 @@
                                (cond (and (map? elem)
                                           (contains? elem :type)
                                           (= "eden.link.placeholder" (namespace (:type elem))))
-                                     (let [link-content (cond
-                                                          (and (:lang elem) (:content-key elem))
-                                                          (get-in ctx [:content (:lang elem) (:content-key elem)])
-                                                          :else
-                                                          page-content)]
+                                     (let [link (apply merge (map #(select-keys % [:lang :content-key :nav]) [page-content elem]))]
                                        (case (:type elem)
-                                         :eden.link.placeholder/href (resolve-link ctx link-content elem)
-                                         :eden.link.placeholder/title (:title link-content)))
+                                         :eden.link.placeholder/href (resolve-link ctx state link)
+                                         :eden.link.placeholder/title (or (:title (get-content ctx link))
+                                                                          "TODO: missing!")))
                                      :else elem))
                              page)))))
                   rendered))))
@@ -67,7 +79,7 @@
             (into []
                   (map (fn [{:keys [rendered/page] :as page-content}]
                          (assoc page-content
-                                :path (resolve-link ctx page-content)
+                                :path (resolve-link ctx state (select-keys page-content [:lang :content-key]))
                                 :html/output (str "<!DOCTYPE html>" (rs/render page)))))
                   rendered))))
 
@@ -127,7 +139,7 @@
 
 (defn build-site
   "build-site"
-  [{:keys [site-config] :as ctx}]
+  [{:keys [site-config valid-content-keys] :as ctx}]
   (let [initial-queue (into clojure.lang.PersistentQueue/EMPTY (:render-roots site-config))]
     (loop [render-queue initial-queue
            state {:attempted #{}
@@ -141,7 +153,10 @@
               sections (atom {})
               warnings (atom [])
               context (assoc ctx
-                             :add-reference! #(do (swap! references conj %) nil)
+                             :add-reference! (fn [ref]
+                                               (when (valid-content-keys ref)
+                                                 (swap! references conj ref))
+                                               nil)
                              :add-section! #(do (swap! sections assoc %1 %2) nil)
                              :warn! #(do (swap! warnings conj %) nil))
               rendered (render-page context page-id)

@@ -5,6 +5,13 @@
   [elem]
   (and (vector? elem) (keyword? (first elem))))
 
+(defn- hiccup-add-attributes [elem attribs]
+  (if (hiccup? elem)
+    (if (map? (second elem))
+      (update elem 1 merge attribs)
+      (into [(first elem) attribs] (rest elem)))
+    elem))
+
 (defn- vector-of-vectors? [elem]
   (and (vector? elem)
        (every? vector? elem)))
@@ -250,14 +257,14 @@
                      {:data processed-render-spec}
                      processed-render-spec)
 
-        page-id (:data final-spec)
+        content-key (:data final-spec)
 
         lang (or (:lang context)
                  (throw (ex-info "Language not set in context"
                                  {:context context
                                   :render-spec final-spec})))
 
-        page-data (or (get-in context [:content lang page-id])
+        page-data (or (get-in context [:content lang content-key])
                       (warn! context
                              {:type :missing-page-content
                               :directive :eden/render
@@ -266,7 +273,7 @@
 
         template-key (or (:template final-spec)
                          (:template page-data)
-                         page-id)
+                         content-key)
 
         template (or (get-in context [:templates template-key])
                      (and page-data
@@ -277,18 +284,19 @@
                                   :template template-key
                                   :spec final-spec})))]
 
-    (when-let [{:keys [section-id]} final-spec]
+    (when-let [section-id (:section-id final-spec)]
       (add-section! context section-id))
 
     (if template
       (let [render-context (assoc context
                                   :data (assoc page-data :lang lang)
-                                  ;; TODO: why content-key? page-id?
-                                  :content-key page-id
-                                  ;; this is probably better
-                                  :page-id page-id)
-            results (process template render-context)]
-        results)
+                                  :content-key content-key)
+            results (process template render-context)
+            section-slug (and (:section-id final-spec)
+                              (or (:slug page-data) (and (keyword? content-key) (name content-key))))]
+        (if (and (hiccup? results) section-slug)
+          (hiccup-add-attributes results {:id section-slug})
+          results))
       [:span.missing-content (str "[:eden/render " (:data final-spec) "]")])))
 
 (defmethod process-directive :eden/with [[_ data-key & body] context]

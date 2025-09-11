@@ -204,11 +204,13 @@
                             (assoc acc lang-code lang-strings)
                             acc))
                         {}
-                        (:lang config))]
+                        (:lang config))
+        content (load-all-content-files site-root (or (:content site-config) "content"))]
     {:site-config config
      :default-lang (config/find-default-language config)
      :templates (load-templates (io/file site-root (or (:templates site-config) "templates")))
-     :content (load-all-content-files site-root (or (:content site-config) "content"))
+     :content content
+     :valid-content-keys (into #{} (mapcat keys) (vals content))
      :strings strings
      :build-constants build-constants
      :fns {:url->filepath url->filepath

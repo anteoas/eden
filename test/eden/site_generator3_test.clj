@@ -291,17 +291,29 @@
 
   (testing "simple component, adds section"
     (let [sections (atom {})]
-      (sg/process [:eden/render {:data :sidebar
-                                 :section-id :my-section}]
-                  {:add-section! (fn [section-id parent]
-                                   (swap! sections assoc section-id parent))
-                   :lang :en
-                   :content-key :the-parent
-                   :content {:en {:sidebar {:hello "world" :template :foo}}}
-                   :templates {:sidebar [:h2 [:eden/get :hello]]
-                               :foo [:p "I am foo"]
-                               :yoyo [:div "pang pang"]}})
-      (is (= {:my-section {:parent :the-parent}} @sections)))))
+      (is (= [:p {:id "sidebar"} "I am foo"]
+             (sg/process [:eden/render {:data :sidebar
+                                        :section-id :my-sidebar-section}]
+                         {:add-section! (fn [section-id parent]
+                                          (swap! sections assoc section-id parent))
+                          :lang :en
+                          :content-key :the-parent
+                          :content {:en {:sidebar {:hello "world" :template :foo}}}
+                          :templates {:sidebar [:h2 [:eden/get :hello]]
+                                      :foo [:p "I am foo"]
+                                      :yoyo [:div "pang pang"]}})))
+      (is (= {:my-sidebar-section {:parent :the-parent}} @sections)))
+
+    (testing "attributes are merged"
+      (is (= [:p {:bla "bla" :id "sidebar"} "I am foo"]
+             (sg/process [:eden/render {:data :sidebar
+                                        :section-id true}]
+                         {:lang :en
+                          :content-key :the-parent
+                          :content {:en {:sidebar {:hello "world" :template :foo}}}
+                          :templates {:sidebar [:h2 [:eden/get :hello]]
+                                      :foo [:p {:bla "bla"} "I am foo"]
+                                      :yoyo [:div "pang pang"]}}))))))
 
 (deftest eden-with
   (testing "merge product details"
