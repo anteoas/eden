@@ -72,7 +72,7 @@ Content files can be either EDN or Markdown:
  :content/html "<p>Welcome to our company...</p>"}
 ```
 
-Note: Markdown content is automatically converted to HTML and stored under `:content/html`. You can add this manually in EDN files but markdown is preferred for prose content.
+Note: Markdown content is automatically converted to HTML and stored under `:html/content`. You can add this manually in EDN files but markdown is preferred for prose content.
 
 #### Markdown Content (content/en/blog-post.md):
 ```markdown
@@ -131,13 +131,13 @@ After initializing your site with `clj -Teden init`, you'll have npm scripts ava
 
 ```bash
 # Start dev server with file watching and hot reload
-npm run dev
+npm run watch
 ```
 
 This will:
 - Watch for file changes
 - Automatically rebuild affected pages
-- Serve your site at http://localhost:3000
+- Serve your site
 - Show build reports with warnings
 
 ### Production Build
@@ -160,8 +160,8 @@ You can also use the Eden tool directly without npm:
 # Show available commands
 clj -Teden help
 
-# Development server
-clj -Teden dev
+# Development
+clj -Teden watch
 
 # Production build
 clj -Teden build
@@ -191,21 +191,21 @@ Eden makes it easy to build multilingual sites with the `:eden/t` directive:
 
 ### Translation with Interpolation
 ```clojure
-;; Template with variable substitution
-[:p [:eden/t :greeting {:name [:eden/get :user-name]}]]
-
 ;; strings.edn - use {{variable}} syntax
 {:greeting "Hello, {{name}}!"}
+
+;; Template with variable substitution
+[:p [:eden/t :greeting {:name [:eden/get :user-name]}]]
 ```
 
 ### Nested Translation Keys
 ```clojure
-;; Use vectors for nested keys
-[:span [:eden/t [:errors :not-found]]]
-
 ;; In strings.edn
 {:errors {:not-found "Page not found"
           :forbidden "Access denied"}}
+
+;; Use vectors for nested keys
+[:span [:eden/t [:errors :not-found]]]
 ```
 
 ## Working with Multiple Languages
@@ -249,7 +249,7 @@ content/
 
 ### Image Processing
 
-Enable automatic image processing:
+Enable automatic image processing (site.edn):
 
 ```clojure
 {:image-processor true}
@@ -310,10 +310,10 @@ Eden distinguishes between standalone pages and sections within pages:
 When you use `:eden/render` with a `:section-id`, it creates a section that can be linked to:
 
 ```clojure
-;; Creates a section with id="team" on the about page
+;; Creates a section on the about page
 [:eden/render {:data :about.team
                :template :team-section
-               :section-id "team"}]
+               :section-id true}]
 
 ;; Link to it from anywhere
 [:eden/link :about.team
