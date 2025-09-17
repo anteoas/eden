@@ -38,10 +38,21 @@
                   [name (load-template file)])))
          (into {}))))
 
+(defn load-css
+  [site-root ^File assets-dir]
+  (when (.exists assets-dir)
+    (->> (filter
+          #(re-matches #".*\.css" (str %))
+          (file-seq assets-dir))
+         (map (fn [path]
+                (let [absolute-path (fs/absolutize path)]
+                  {:source-path (str absolute-path)
+                   :content (slurp path)
+                   :relative-path (str (fs/relativize site-root absolute-path))})))
+         (into []))))
+
 (defn parse-markdown
-  "Parse markdown file with metadata. Supports two formats:
-   1. EDN format: {:key value ...} followed by ---
-   2. Legacy format: key: value lines at start
+  "Parse markdown file with edn metadata.
    Returns map with metadata and :markdown/content."
   [content]
   (let [trimmed (str/trim content)]
@@ -209,6 +220,7 @@
     {:site-config config
      :default-lang (config/find-default-language config)
      :templates (load-templates (io/file site-root (or (:templates site-config) "templates")))
+     :css (load-css site-root (io/file site-root (or (:assets site-config) "assets")) )
      :content content
      :valid-content-keys (into #{} (mapcat keys) (vals content))
      :strings strings

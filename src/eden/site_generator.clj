@@ -682,49 +682,4 @@
    elem))
 
 ;; Image URL extraction (unchanged)
-(defn extract-image-urls
-  "Extract image URLs with query parameters from HTML or CSS."
-  [content]
-  (let [url-pattern #"(?:src=[\"']?|url\([\"']?)(/assets/images/[^\"')\s]+\?[^\"')\s]+)"
 
-        parse-params (fn [query-string]
-                       (let [params (java.net.URLDecoder/decode ^String query-string "UTF-8")
-                             pairs (str/split params #"&")]
-                         (reduce (fn [m pair]
-                                   (let [[k v] (str/split pair #"=" 2)]
-                                     (case k
-                                       "size" (if-let [[_ w h] (re-matches #"^(\d+)x(.*)$" v)]
-                                                (cond
-                                                  (not (str/blank? h))
-                                                  (if (re-matches #"\d+" h)
-                                                    (assoc m :width (Long/parseLong w)
-                                                           :height (Long/parseLong h))
-                                                    (assoc m :error (str "Invalid height: " h)))
-                                                  :else
-                                                  (assoc m :width (Long/parseLong w)))
-                                                (assoc m :error (str "Invalid size format: " v)))
-                                       m)))
-                                 {}
-                                 pairs)))
-
-        generate-replace-url (fn [path params]
-                               (let [[base-path ext] (let [last-dot (.lastIndexOf ^String path ".")]
-                                                       [(subs path 0 last-dot)
-                                                        (subs path (inc last-dot))])
-                                     {:keys [width height]} params
-                                     size-suffix (cond
-                                                   (and width height) (str "-" width "x" height)
-                                                   width (str "-" width "x")
-                                                   :else "")]
-                                 (str base-path size-suffix "." ext)))]
-
-    (->> (re-seq url-pattern content)
-         (map (fn [[_ url]]
-                (let [[path query-string] (str/split url #"\?" 2)
-                      params (parse-params query-string)]
-                  (cond-> {:url url
-                           :source-path path}
-                    (not (:error params)) (merge (select-keys params [:width :height])
-                                                 {:replace-url (generate-replace-url path params)})
-                    (:error params) (assoc :error (:error params))))))
-         vec)))

@@ -3,34 +3,79 @@
             [clojure.java.io :as io]
             [clojure.java.process :as process]
             [clojure.data.json :as json]
-            [eden.site-generator :as sg]
-            [eden.image-processor :as img])
+            [eden.image-processor :as img]
+            [eden.esbuild :as esbuild])
   (:import [java.lang ProcessBuilder ProcessBuilder$Redirect]
            [java.io File]))
 
+(defn- extract-image-urls
+  "Extract image URLs with query parameters from HTML or CSS."
+  [content]
+  (let [url-pattern #"(?:src=[\"']?|url\([\"']?)(/assets/images/[^\"')\s]+\?[^\"')\s]+)"
+        parse-params (fn [query-string]
+                       (let [params (java.net.URLDecoder/decode ^String query-string "UTF-8")
+                             pairs (str/split params #"&")]
+                         (reduce (fn [m pair]
+                                   (let [[k v] (str/split pair #"=" 2)]
+                                     (case k
+                                       "size" (if-let [[_ w h] (re-matches #"^(\d+)x(.*)$" v)]
+                                                (cond
+                                                  (not (str/blank? h))
+                                                  (if (re-matches #"\d+" h)
+                                                    (assoc m :width (Long/parseLong w)
+                                                           :height (Long/parseLong h))
+                                                    (assoc m :error (str "Invalid height: " h)))
+                                                  :else
+                                                  (assoc m :width (Long/parseLong w)))
+                                                (assoc m :error (str "Invalid size format: " v)))
+                                       m)))
+                                 {}
+                                 pairs)))
+
+        generate-replace-url (fn [path params]
+                               (let [[base-path ext] (let [last-dot (.lastIndexOf ^String path ".")]
+                                                       [(subs path 0 last-dot)
+                                                        (subs path (inc last-dot))])
+                                     {:keys [width height]} params
+                                     size-suffix (cond
+                                                   (and width height) (str "-" width "x" height)
+                                                   width (str "-" width "x")
+                                                   :else "")]
+                                 (str base-path size-suffix "." ext)))]
+
+    (into []
+          (map (fn [[_ url]]
+                 (let [[path query-string] (str/split url #"\?" 2)
+                       params (parse-params query-string)]
+                   (cond-> {:url url
+                            :source-path path}
+                     (not (:error params)) (merge (select-keys params [:width :height])
+                                                  {:replace-url (generate-replace-url path params)})
+                     (:error params) (assoc :error (:error params))))))
+          (re-seq url-pattern content))))
+
+
 (defn process-images
   "Process images in HTML and CSS files based on query parameters."
-  [html-files css-files root-path]
-  (let [;; Extract image URLs from all HTML and CSS
-        html-image-urls (mapcat #(sg/extract-image-urls (:html %)) html-files)
-        css-image-urls (mapcat #(sg/extract-image-urls (slurp %)) css-files)
-        all-image-urls (concat html-image-urls css-image-urls)
+  [{:keys [site-config rendered css] :as _ctx}]
+  (let [root-path (:root-path site-config)
+        output-path (:output-path site-config)
 
-        ;; Ensure .temp/images directory exists
-        temp-dir (io/file ".temp/images")
-        _ (io/make-parents (io/file temp-dir "dummy.txt"))
+        ;; Extract image URLs from all HTML and CSS
+        html-image-urls (into #{} (mapcat #(extract-image-urls (:html/output %)) rendered))
+        css-image-urls (into #{} (mapcat #(extract-image-urls (:content %)) css))
+        all-image-urls (concat css-image-urls html-image-urls)
 
-        ;; Process each unique image
-        _ (doall
-           (for [img-data all-image-urls]
-             (when-not (:error img-data)
-               (let [;; Convert web path to file system path
-                     source-path (str root-path (:source-path img-data))
-                     output-dir ".temp/images"]
-                 ;; Call image processor with consistent keys
-                 (img/process-image (merge {:source-path source-path
-                                            :output-dir output-dir}
-                                           (select-keys img-data [:width :height])))))))
+        image-results (mapv
+                       (fn [img-data]
+                         (if (:error img-data)
+                           img-data
+                           (let [opts (-> (select-keys img-data [:height :width])
+                                          (assoc :source-path (str root-path (:source-path img-data))
+                                                 :output-path (str output-path (:source-path img-data))))]
+                             (merge opts (img/process-image opts)))))
+                       all-image-urls)
+
 
         ;; Build URL replacement map
         url-replacements (reduce (fn [m img-data]
@@ -40,107 +85,61 @@
                                  {}
                                  all-image-urls)]
 
-    ;; Replace URLs in HTML files
-    (map (fn [html-file]
-           (let [updated-html (reduce (fn [html [old-url new-url]]
-                                        (str/replace html old-url new-url))
-                                      (:html html-file)
-                                      url-replacements)]
-             (assoc html-file :html updated-html)))
-         html-files)))
+    {:image-results image-results
 
-(defn- ensure-npm-setup
-  "Ensure npm is set up in the site directory with esbuild"
-  [site-dir]
-  (let [package-json (io/file site-dir "package.json")
-        node-modules (io/file site-dir "node_modules")]
-    ;; Only install dependencies if package.json exists
-    (when (and (.exists package-json)
-               (not (.exists node-modules)))
-      (println "  Installing npm dependencies...")
-      (process/exec {:dir site-dir} "npm" "install")
-      (println "  npm dependencies installed"))))
+     ;; Replace urls in HTML
+     :rendered
+     (mapv (fn [html-file]
+             (let [updated-html (reduce (fn [html [old-url new-url]]
+                                          (str/replace html old-url new-url))
+                                        (:html/output html-file)
+                                        url-replacements)]
+               (assoc html-file :html/replaced updated-html)))
+           rendered)
 
-(defn- bundle-css
-  "Bundle CSS with esbuild, or copy files if esbuild not available"
-  [site-root output-dir mode]
-  (let [css-dir (io/file site-root "assets" "css")
-        css-files (when (.exists css-dir)
-                    (seq (.listFiles css-dir (reify java.io.FilenameFilter
-                                               (accept [_ _dir name]
-                                                 (.endsWith name ".css"))))))]
-    (when css-files
-      (let [css-start (System/currentTimeMillis)
-            out-dir (io/file output-dir "assets" "css")
-            _ (io/make-parents (io/file out-dir "dummy"))
-            ;; esbuild path is relative to site-root
-            esbuild-path (io/file site-root "node_modules" ".bin" "esbuild")
-            bundled-files (if (.exists esbuild-path)
-                            ;; Use esbuild if available
-                            (into []
-                                  (mapcat (fn [css-file]
-                                            (let [css-path (File/.getPath css-file)
-                                                  out-file (io/file out-dir (File/.getName css-file))
-                                                  args (into-array String
-                                                                   (cond-> [(File/.getPath esbuild-path) css-path "--bundle"
-                                                                            (str "--outfile=" (File/.getPath out-file))
-                                                                            "--metafile=/dev/stdout"
-                                                                            "--external:/assets/*"
-                                                                            "--loader:.css=css"
-                                                                            "--log-level=error"]
-                                                                     (= mode :prod) (conj "--minify")))]
-                                              (try
-                                                ;; Use ProcessBuilder to capture stdout separately
-                                                (let [pb (new ProcessBuilder ^"[Ljava.lang.String;" args)
-                                                      _ (.redirectError pb ProcessBuilder$Redirect/DISCARD)
-                                                      p (.start pb)
-                                                      output (slurp (.getInputStream p))
-                                                      exit-code (.waitFor p)]
-                                                  (if (zero? exit-code)
-                                                    ;; Parse JSON from stdout
-                                                    (if (and output (not (str/blank? output)))
-                                                      (let [meta-data (json/read-str output :key-fn keyword)
-                                                            outputs (:outputs meta-data)]
-                                                        (map (fn [[out-path out-info]]
-                                                               {:file (File/.getName (io/file (str out-path)))
-                                                                :size (:bytes out-info)
-                                                                :type :css})
-                                                             outputs))
-                                                      ;; Fallback if no metadata
-                                                      [{:file (File/.getName css-file)
-                                                        :size (.length out-file)
-                                                        :type :css}])
-                                                    (do
-                                                      (println (format "    CSS %s failed with exit code %d"
-                                                                       (File/.getName css-file) exit-code))
-                                                      [])))
-                                                (catch Exception e
-                                                  (println (format "    CSS %s failed: %s" (File/.getName css-file) (.getMessage e)))
-                                                  []))))
-                                          css-files))
-                            ;; Otherwise just copy the files
-                            (mapv (fn [css-file]
-                                    (let [out-file (io/file out-dir (File/.getName css-file))]
-                                      (io/copy css-file out-file)
-                                      {:file (File/.getName css-file)
-                                       :size (.length out-file)
-                                       :type :css}))
-                                  css-files))]
-        {:elapsed (- (System/currentTimeMillis) css-start)
-         :files bundled-files}))))
+     ;; Replace urls in css
+     :css
+     (mapv (fn [css-file]
+             (let [updated-css (reduce (fn [css [old-url new-url]]
+                                         (str/replace css old-url new-url))
+                                       (:content css-file)
+                                       url-replacements)]
+               (assoc css-file :replaced updated-css)))
+           css)}))
+
+(defn- copy-css
+  "For now just copy css files over"
+  [ctx]
+  (when-let [css (seq (:css ctx))]
+    (let [copy-start (System/currentTimeMillis)
+          output-dir (io/file (:output-path (:site-config ctx)))
+          files (mapv (fn [{:keys [content relative-path]}]
+              (let [output-file (io/file output-dir relative-path)]
+                (io/make-parents output-file)
+                (io/copy content output-file)
+                {:file (File/.getName output-file)
+                 :path (str output-file)
+                 :size (File/.length output-file)
+                 :type :css}))
+                      css)]
+      {:elapsed (- (System/currentTimeMillis) copy-start)
+       :files files})))
 
 (defn- bundle-js
   "Bundle JavaScript with esbuild, or copy files if esbuild not available"
-  [site-root output-dir mode]
-  (let [js-dir (io/file site-root "assets" "js")
-        js-files (when (.exists js-dir)
-                   (seq (.listFiles js-dir (reify java.io.FilenameFilter
-                                             (accept [_ _dir name]
-                                               (.endsWith name ".js"))))))]
+  [ctx]
+  (let [site-root (-> ctx :site-config :root-path)
+        assets-path (or (-> ctx :site-config :assets) "assets")
+        js-dir (io/file site-root assets-path "js")
+        js-files (when (and (File/.exists js-dir)
+                            (File/.isDirectory js-dir))
+                   (filter #(str/ends-with? % ".js") (file-seq js-dir)))]
     (when js-files
       (let [js-start (System/currentTimeMillis)
-            out-dir (io/file output-dir "assets" "js")
-            _ (io/make-parents (io/file out-dir "dummy"))
+            output-path (-> ctx :site-config :output-path)
+            mode (:mode ctx)
+            out-dir (io/file output-path assets-path "js")
+            _ (io/make-parents (io/file out-dir "."))
             ;; esbuild path is relative to site-root
             esbuild-path (io/file site-root "node_modules" ".bin" "esbuild")
             bundled-files (if (.exists esbuild-path)
@@ -149,17 +148,20 @@
                                   (mapcat (fn [js-file]
                                             (let [js-path (File/.getPath js-file)
                                                   out-file (io/file out-dir (File/.getName js-file))
-                                                  args (into-array String
-                                                                   (cond-> [(File/.getPath esbuild-path) js-path "--bundle"
-                                                                            (str "--outfile=" (File/.getPath out-file))
-                                                                            "--metafile=/dev/stdout"
-                                                                            "--format=iife"
-                                                                            "--log-level=error"]
-                                                                     (= mode :dev) (conj "--sourcemap")
-                                                                     (= mode :prod) (conj "--minify")))]
+                                                  args (into
+                                                         [(File/.getPath esbuild-path) js-path]
+                                                         (esbuild/args (cond-> {:bundle true
+                                                                                :outfile (File/.getPath out-file)
+                                                                                :metafile "/dev/stdout"
+                                                                                :format "iife"
+                                                                                :log-level "error"}
+                                                                         (= mode :dev) (assoc :sourcemap true)
+                                                                         (= mode :prod) (assoc :minify true))))]
+
                                               (try
                                                 ;; Use ProcessBuilder to capture stdout separately
-                                                (let [pb (new ProcessBuilder ^"[Ljava.lang.String;" args)
+                                                ;; TODO: clojure.java.process
+                                                (let [pb (new ProcessBuilder ^"[Ljava.lang.String;" (into-array String args))
                                                       _ (.redirectError pb ProcessBuilder$Redirect/DISCARD)
                                                       p (.start pb)
                                                       output (slurp (.getInputStream p))
@@ -170,9 +172,11 @@
                                                       (let [meta-data (json/read-str output :key-fn keyword)
                                                             outputs (:outputs meta-data)]
                                                         (map (fn [[out-path out-info]]
-                                                               {:file (File/.getName (io/file (str out-path)))
-                                                                :size (:bytes out-info)
-                                                                :type :js})
+                                                               (let [output-file (io/file (name out-path))]
+                                                                 {:file (File/.getName output-file)
+                                                                  :size (:bytes out-info)
+                                                                  :path (File/.getAbsolutePath output-file)
+                                                                  :type :js}))
                                                              outputs))
                                                       ;; Fallback if no metadata
                                                       [{:file (File/.getName js-file)
@@ -199,20 +203,8 @@
 
 (defn bundle-assets
   "Bundle all CSS and JS assets"
-  [site-root output-dir mode]
-  ;; Only ensure npm setup if we're in a traditional Eden project structure
-  ;; (with site/ subdirectory), not in a generated site
-  (let [site-subdir (io/file site-root "site")]
-    (when (.exists site-subdir)
-      (ensure-npm-setup site-root)))
-  (println "  Bundling assets:")
-  (let [css-result (bundle-css site-root output-dir mode)
-        js-result (bundle-js site-root output-dir mode)]
-    ;; Print timing info
-    (when css-result
-      (println (format "    CSS: %dms" (:elapsed css-result))))
-    (when js-result
-      (println (format "    JS: %dms" (:elapsed js-result))))
-    ;; Return bundle info for reporting
-    {:css css-result
-     :js js-result}))
+  [ctx]
+  {:assets-output {:css (copy-css ctx)
+                   :js (bundle-js ctx)}})
+
+

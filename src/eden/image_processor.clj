@@ -125,14 +125,12 @@
     (ImageIO/write ^BufferedImage buffered-image ^String extension ^File output-file)
 
     {:output-path (.getAbsolutePath ^File output-file)
-     :processed? true
      :placeholder? true}))
 
 (defn process-image
   "Process a single image with given options.
    Generates placeholder if source doesn't exist.
    Copies as-is if no width/height specified.
-   No-op if output already exists.
    
    Options:
    - :allow-stretch - Set to true to allow stretching images (default: false)"
@@ -140,94 +138,77 @@
   (try
     (let [output-filename (generate-output-filename source-path width height)
           output-file (io/file output-dir output-filename)
-          output-path (.getAbsolutePath ^File output-file)]
+          output-path (.getAbsolutePath ^File output-file)
+          source-file (io/file source-path)]
 
-      ;; Check if output already exists
-      (if (.exists ^File output-file)
-        {:output-path output-path
-         :processed? false
-         :placeholder? false
-         :error nil}
+      ;; Ensure output directory exists
+      (io/make-parents output-file)
+      (if (.exists ^File source-file)
+        ;; Process or copy the actual image
+        (if (or width height)
+          ;; Scale with imgscalr
+          (let [original ^BufferedImage (ImageIO/read source-file)
+                ;; Empty BufferedImageOp array for varargs
+                ops ^"[Ljava.awt.image.BufferedImageOp;" (make-array java.awt.image.BufferedImageOp 0)
+                ;; Use ULTRA_QUALITY for best results
+                ^BufferedImage scaled (cond
+                                        ;; Both dimensions: only use FIT_EXACT if stretching is allowed
+                                        (and width height)
+                                        (if allow-stretch
+                                          ;; User explicitly wants stretching
+                                          (Scalr/resize original
+                                                        Scalr$Method/ULTRA_QUALITY
+                                                        Scalr$Mode/FIT_EXACT
+                                                        ^Integer width
+                                                        ^Integer height
+                                                        ops)
+                                          ;; Default: fit within bounds maintaining aspect ratio
+                                          (Scalr/resize original
+                                                        Scalr$Method/ULTRA_QUALITY
+                                                        Scalr$Mode/AUTOMATIC
+                                                        ^Integer width
+                                                        ^Integer height
+                                                        ops))
 
-        ;; Check if source exists
-        (let [source-file (io/file source-path)]
-          (if (.exists ^File source-file)
-            ;; Process or copy the actual image
-            (do
-              ;; Ensure output directory exists
-              (io/make-parents output-file)
+                                        ;; Width only: scale maintaining aspect ratio
+                                        width
+                                        (Scalr/resize original
+                                                      Scalr$Method/ULTRA_QUALITY
+                                                      ^Integer width
+                                                      ops)
 
-              (if (or width height)
-                ;; Scale with imgscalr
-                (let [original ^BufferedImage (ImageIO/read source-file)
-                      ;; Empty BufferedImageOp array for varargs
-                      ops ^"[Ljava.awt.image.BufferedImageOp;" (make-array java.awt.image.BufferedImageOp 0)
-                      ;; Use ULTRA_QUALITY for best results
-                      ^BufferedImage scaled (cond
-                                              ;; Both dimensions: only use FIT_EXACT if stretching is allowed
-                                              (and width height)
-                                              (if allow-stretch
-                                                ;; User explicitly wants stretching
-                                                (Scalr/resize original
-                                                              Scalr$Method/ULTRA_QUALITY
-                                                              Scalr$Mode/FIT_EXACT
-                                                              ^Integer width
-                                                              ^Integer height
-                                                              ops)
-                                                ;; Default: fit within bounds maintaining aspect ratio
-                                                (Scalr/resize original
-                                                              Scalr$Method/ULTRA_QUALITY
-                                                              Scalr$Mode/AUTOMATIC
-                                                              ^Integer width
-                                                              ^Integer height
-                                                              ops))
+                                        ;; Height only: use FIT_TO_HEIGHT mode
+                                        :else
+                                        (Scalr/resize original
+                                                      Scalr$Method/ULTRA_QUALITY
+                                                      Scalr$Mode/FIT_TO_HEIGHT
+                                                      ^Integer height
+                                                      ops))
+                extension (get-image-extension source-path)]
 
-                                              ;; Width only: scale maintaining aspect ratio
-                                              width
-                                              (Scalr/resize original
-                                                            Scalr$Method/ULTRA_QUALITY
-                                                            ^Integer width
-                                                            ops)
+            ;; Write the scaled image
+            (ImageIO/write scaled ^String extension output-file)
 
-                                              ;; Height only: use FIT_TO_HEIGHT mode
-                                              :else
-                                              (Scalr/resize original
-                                                            Scalr$Method/ULTRA_QUALITY
-                                                            Scalr$Mode/FIT_TO_HEIGHT
-                                                            ^Integer height
-                                                            ops))
-                      extension (get-image-extension source-path)]
+            ;; Flush the scaled image to free memory
+            (.flush scaled)
 
-                  ;; Write the scaled image
-                  (ImageIO/write scaled ^String extension output-file)
+            {:output-path output-path
+             :placeholder? false})
 
-                  ;; Flush the scaled image to free memory
-                  (.flush scaled)
+          ;; Just copy the file as-is
+          (do
+            (io/copy source-file output-file)
+            {:output-path output-path
+             :placeholder? false}))
 
-                  {:output-path output-path
-                   :processed? true
-                   :placeholder? false
-                   :error nil})
-
-                ;; Just copy the file as-is
-                (do
-                  (io/copy source-file output-file)
-                  {:output-path output-path
-                   :processed? true
-                   :placeholder? false
-                   :error nil})))
-
-            ;; Generate placeholder
-            (generate-placeholder {:output-path output-path
-                                   :width (or width 400)
-                                   :height (or height 300)
-                                   :source-path source-path})))))
+        ;; Generate placeholder
+        (generate-placeholder {:output-path output-path
+                               :width (or width 400)
+                               :height (or height 300)
+                               :source-path source-path})))
 
     (catch Exception e
-      {:output-path nil
-       :processed? false
-       :placeholder? false
-       :error (.getMessage e)})))
+      {:error (.getMessage e)})))
 
 (comment
   ;; Test scaling

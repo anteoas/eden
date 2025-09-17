@@ -59,22 +59,14 @@
 
 (defn process-images-step
   "Process images if enabled"
-  [{:keys [site-config rendered]}]
-
-  (let [root-path (:root-path site-config)
-        html-files (mapv :html/output rendered)
-        css-files (->> (io/file root-path (or (:assets site-config) "assets"))
-                       file-seq
-                       (filter #(re-matches #".*\.css$" (str %))))]
-    (when (:image-processor site-config)
-      (assets/process-images html-files css-files root-path))))
+  [{:keys [site-config] :as ctx}]
+  (when (:image-processor site-config)
+    (assets/process-images ctx)))
 
 (defn bundle-assets-step
   "Bundle CSS and JS assets"
-  [{:keys [site-config mode]}]
-  (let [root-path (:root-path site-config)
-        output-path (:output-path site-config)]
-    {:bundle-info (assets/bundle-assets root-path output-path mode)}))
+  [ctx]
+  (assets/bundle-assets ctx))
 
 (defn copy-static-step
   "Copy static assets (excluding CSS/JS which are bundled)"
