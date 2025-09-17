@@ -4,11 +4,10 @@
             [clojure.java.io :as io]
             [clojure.java.process :as process]
             [hawkeye.core :as hawk]
-            [eden.report :as report]
+            [eden.init :as init]
             [eden.mcp :as mcp]
-            [eden.loader :as loader]
             [eden.pipeline :refer [|>] :as pipeline]
-            [eden.init :as init])
+            [eden.report :as report])
   (:import [java.io File]))
 
 (defn- find-available-port
@@ -80,10 +79,9 @@
                  pipeline/copy-static-step
                  pipeline/write-output-step
                  )]
-    ;; TODO: reports
-    ;; (report/print-build-report result)
-    ;; (report/generate-html-report result)
-    (println "\nBuild complete!")))
+    (report/print-build-report result)
+    (when (:error result)
+      (System/exit 1))))
 
 (defn- start-watch
   "Start watching for file changes and rebuild on change.

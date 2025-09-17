@@ -72,9 +72,9 @@
         (process default-value context)
         (do (warn! context
                    {:type :missing-key
+                    :template (some-> context :data :template)
                     :key processed-key
-                    ;; TODO: rendering stack
-                    })
+                    :directive :eden/get})
             [:span.missing-content (str "[:eden/get " processed-key "]")]))
 
       (= processed-key :html/content)
