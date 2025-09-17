@@ -3,7 +3,7 @@
             [clojure.string :as str]
             [clojure.walk :as walk]
             [replicant.string :as rs]
-            [eden.site-generator3 :as sg]))
+            [eden.site-generator :as sg]))
 
 (defn- get-content [ctx {:keys [content-key lang]}]
   (and lang content-key

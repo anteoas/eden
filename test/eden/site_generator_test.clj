@@ -1,7 +1,6 @@
-(ns eden.site-generator3-test
+(ns eden.site-generator-test
   (:require [clojure.test :refer [deftest is testing] :as t]
-            [eden.site-generator3 :as sg]))
-
+            [eden.site-generator :as sg]))
 
 (deftest process
   (testing "basic"
