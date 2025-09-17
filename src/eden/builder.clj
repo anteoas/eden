@@ -61,6 +61,7 @@
                              (fn [elem]
                                (cond (and (map? elem)
                                           (contains? elem :type)
+                                          (qualified-keyword? (:type elem))
                                           (= "eden.link.placeholder" (namespace (:type elem))))
                                      (let [link (apply merge (map #(select-keys % [:lang :content-key :nav]) [page-content elem]))]
                                        (case (:type elem)
