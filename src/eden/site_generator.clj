@@ -73,6 +73,7 @@
         (do (warn! context
                    {:type :missing-key
                     :template (some-> context :data :template)
+                    :content-key (:content-key context)
                     :key processed-key
                     :directive :eden/get})
             [:span.missing-content (str "[:eden/get " processed-key "]")]))
@@ -257,6 +258,7 @@
                      {:data processed-render-spec}
                      processed-render-spec)
 
+        parent-content-key (:content-key context)
         content-key (:data final-spec)
 
         lang (or (:lang context)
@@ -268,6 +270,8 @@
                       (warn! context
                              {:type :missing-page-content
                               :directive :eden/render
+                              :parent parent-content-key
+                              :content-key content-key
                               :lang lang
                               :spec final-spec}))
 
@@ -280,6 +284,8 @@
                           (warn! context
                                  {:type :missing-render-template
                                   :directive :eden/render
+                                  :parent parent-content-key
+                                  :content-key content-key
                                   :lang lang
                                   :template template-key
                                   :spec final-spec})))]
@@ -317,6 +323,7 @@
                      (warn! context
                             {:type :missing-include-template
                              :directive :eden/include
+                             :content-key (:content-key context)
                              :template processed-template-name}))]
     (process template (update context :data merge override-context))))
 
@@ -360,6 +367,8 @@
                                            (str/replace s variable value)
                                            (do (warn! context {:type :not-a-string
                                                                :directive :eden/t
+                                                               :lang (:lang context)
+                                                               :content-key (:content-key context)
                                                                :value value
                                                                :template-variable variable
                                                                :template-string string-template

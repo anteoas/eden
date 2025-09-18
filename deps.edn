@@ -36,7 +36,8 @@
                  :extra-deps {djblue/portal #_{:clj-kondo/ignore [:deps.edn]} {:mvn/version "RELEASE"}}
                  :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
            :test {:extra-paths ["test"]
-                  :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
+                  :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}
+                               metosin/malli {:mvn/version "0.19.1"}}
                   :main-opts ["-m" "kaocha.runner"]
                   :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
            :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}

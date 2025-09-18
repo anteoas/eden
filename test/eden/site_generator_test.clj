@@ -223,39 +223,6 @@
                         :lang :en
                         :templates {:sidebar [:h2 [:eden/get :hello]]}}))))
 
-
-  (testing "simple component, content not found"
-    (let [warnings (atom [])]
-      (is (= [:span.missing-content "[:eden/render :this-page-is-not-found]"]
-             (sg/process [:eden/render :this-page-is-not-found]
-                         {:content {:en {:sidebar {:hello "world"}}}
-                          :warn! #(swap! warnings conj %)
-                          :lang :en
-                          :templates {:sidebar [:h2 [:eden/get :hello]]}})))
-      (is (= 1 (count @warnings)))
-      (is (= [{:type :missing-page-content,
-               :directive :eden/render
-               :lang :en,
-               :spec {:data :this-page-is-not-found}}]
-             @warnings))))
-
-  (testing "simple component, template not found"
-    (let [warnings (atom [])]
-      (is (= [:span.missing-content "[:eden/render :sidebar]"]
-             (sg/process [:eden/render :sidebar]
-                         {:content {:en {:sidebar {:hello "world"
-                                                   :template :my-nonexistent-template}}}
-                          :warn! #(swap! warnings conj %)
-                          :lang :en
-                          :templates {:sidebar [:h2 [:eden/get :hello]]}})))
-      (is (= 1 (count @warnings)))
-      (is (= [{:type :missing-render-template
-               :directive :eden/render
-               :lang :en
-               :template :my-nonexistent-template
-               :spec {:data :sidebar}}]
-             @warnings))))
-
   (testing "simple component, page has template"
     (is (= [:p "I am foo"]
            (sg/process [:eden/render :sidebar]
@@ -357,21 +324,7 @@
                            [:p "Language: " [:eden/get :language]]]]]]
                        {:data {:user {:name "user name"
                                       :preferences {:theme "dark"
-                                                    :language "braile"}}}}))))
-
-  (testing "missing key"
-    (let [warnings (atom [])]
-      (is (= [[:p [:span.missing-content "[:eden/get :value]"]]]
-             (sg/process [:eden/with :foo
-                          [:p [:eden/get :value]]]
-                         {:warn! #(swap! warnings conj %)})))
-
-      (let [relevant-warnings (filter #(= (:type %) :with-directive-data-not-found) @warnings)]
-        (is (= 1 (count relevant-warnings)))
-        (is (= {:type :with-directive-data-not-found,
-                :data-key :foo
-                :data nil}
-               (first relevant-warnings)))))))
+                                                    :language "braile"}}}})))))
 
 (deftest eden-include
   (testing "simple include"

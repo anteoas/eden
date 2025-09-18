@@ -1,6 +1,4 @@
-(ns user
-  (:require [eden.core]
-            [clojure.datafy]))
+(ns user (:require [clojure.datafy]))
 
 (defmacro capture-env
   "Capture local bindings.
@@ -48,3 +46,5 @@
     (defonce _add-tap-only-once (add-tap submit))
     (defn selected [] (selected p))
     (defn popen [] (open p))))
+
+(require '[eden.core])
