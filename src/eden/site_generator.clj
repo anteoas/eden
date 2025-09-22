@@ -65,7 +65,8 @@
 
 (defmethod process-directive :eden/get [[_ key default-value] context]
   (let [processed-key (process key context)
-        value (get-in context [:data processed-key])]
+        value (or (get-in context [:data processed-key])
+                  (get-in context [:build-constants processed-key]))]
     (cond
       (nil? value)
       (if default-value
@@ -85,7 +86,8 @@
 
 (defmethod process-directive :eden/get-in [[_ path default-value] context]
   (let [processed-path (process path context)
-        value (get-in context (into [:data] processed-path))]
+        value (or (get-in context (into [:data] processed-path))
+                  (get-in context (into [:build-constants] processed-path)))]
     (cond
       (nil? value)
       (if default-value
