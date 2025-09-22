@@ -186,7 +186,7 @@
   [{:keys [rendered]
     {:keys [url->filepath]} :fns
     {:keys [output-path]} :site-config}]
-  (doseq [{:keys [path html/output lang content-key] :as page} rendered]
+  (doseq [{:keys [path html/output html/replaced lang content-key] :as page} rendered]
     (let [;; Build the input map for url->filepath
           page-data {:path path
                      :page {:content-key content-key
@@ -197,4 +197,4 @@
           filepath (url->filepath page-data)
           output-file (io/file output-path filepath)]
       (io/make-parents output-file)
-      (spit output-file output))))
+      (spit output-file (or replaced output)))))
