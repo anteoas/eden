@@ -115,16 +115,16 @@
   (let [file (io/file source-path)
         filename (.getName ^File file)
         buffered-image (create-placeholder-image width height filename)
-        extension (get-image-extension source-path)
         output-file (io/file output-path)]
 
     ;; Ensure parent directory exists
     (io/make-parents output-file)
 
     ;; Write the image using ImageIO
-    (ImageIO/write ^BufferedImage buffered-image ^String extension ^File output-file)
+    ;; always write as png, but keep the extension as is.
+    (ImageIO/write ^BufferedImage buffered-image "png" ^File output-file)
 
-    {:output-path (.getAbsolutePath ^File output-file)
+    {:output-path (str output-file)
      :placeholder? true}))
 
 (defn process-image
