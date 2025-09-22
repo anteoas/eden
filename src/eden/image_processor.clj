@@ -134,10 +134,10 @@
    
    Options:
    - :allow-stretch - Set to true to allow stretching images (default: false)"
-  [{:keys [source-path width height output-dir allow-stretch]}]
+  [{:keys [source-path width height output-path allow-stretch]}]
   (try
     (let [output-filename (generate-output-filename source-path width height)
-          output-file (io/file output-dir output-filename)
+          output-file (io/file output-path output-filename)
           output-path (.getAbsolutePath ^File output-file)
           source-file (io/file source-path)]
 
