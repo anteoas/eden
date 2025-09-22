@@ -269,7 +269,7 @@
                                   :render-spec final-spec})))
 
         page-data (or (get-in context [:content lang content-key])
-                      (warn! context
+                      #_(warn! context
                              {:type :missing-page-content
                               :directive :eden/render
                               :parent parent-content-key

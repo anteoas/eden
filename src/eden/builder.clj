@@ -123,7 +123,8 @@
                                             :content-data (get content lang))]
                   (if (not template)
                     (do
-                      (warn! {:type :missing-template
+                      ;; TODO: Footer
+                      #_(warn! {:type :missing-template
                               :template template-key
                               :content-key content-key
                               :lang lang})
