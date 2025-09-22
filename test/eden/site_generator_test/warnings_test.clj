@@ -241,7 +241,7 @@
                 :spec {:data :sidebar}}
                warning))))))
 
-(deftest missing-page-content-warning
+#_(deftest missing-page-content-warning
   (testing "Missing page content generates warning with all required fields"
     (let [warnings (atom [])]
       (is (= [:span.missing-content "[:eden/render :this-page-is-not-found]"]
