@@ -127,6 +127,14 @@
     {:output-path (str output-file)
      :placeholder? true}))
 
+(defn- normalized-parent-path [path]
+  (-> (io/file path)
+      (.getParent)
+      (io/file)
+      (.toPath)
+      (.normalize)
+      str))
+
 (defn process-image
   "Process a single image with given options.
    Generates placeholder if source doesn't exist.
@@ -137,8 +145,8 @@
   [{:keys [source-path width height output-path allow-stretch]}]
   (try
     (let [output-filename (generate-output-filename source-path width height)
-          output-file (io/file output-path output-filename)
-          output-path (.getAbsolutePath ^File output-file)
+          output-dir (normalized-parent-path output-path)
+          output-file (io/file output-dir output-filename)
           source-file (io/file source-path)]
 
       ;; Ensure output directory exists
@@ -192,17 +200,17 @@
             ;; Flush the scaled image to free memory
             (.flush scaled)
 
-            {:output-path output-path
+            {:output-path (str output-file)
              :placeholder? false})
 
           ;; Just copy the file as-is
           (do
             (io/copy source-file output-file)
-            {:output-path output-path
+            {:output-path (str output-file)
              :placeholder? false}))
 
         ;; Generate placeholder
-        (generate-placeholder {:output-path output-path
+        (generate-placeholder {:output-path (str output-file)
                                :width (or width 400)
                                :height (or height 300)
                                :source-path source-path})))
