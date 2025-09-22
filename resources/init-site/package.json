@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "clj -Teden watch :site-edn '\"site.edn\"'",
-    "watch": "clj -Teden watch :site-edn '\"site.edn\"'",
-    "build": "clj -Teden build :site-edn '\"site.edn\"'",
-    "build:prod": "clj -Teden build :site-edn '\"site.edn\"' :mode '\"prod\"'",
-    "serve": "clj -Teden serve :block? true",
-    "clean": "clj -Teden clean",
-    "mcp-stdio": "clj -Teden mcp-stdio :site-edn '\"site.edn\"'"
+    "dev": "clojure -Teden watch :site-edn '\"site.edn\"'",
+    "watch": "clojure -Teden watch :site-edn '\"site.edn\"'",
+    "build": "clojure -Teden build :site-edn '\"site.edn\"'",
+    "build:prod": "clojure -Teden build :site-edn '\"site.edn\"' :mode '\"prod\"'",
+    "serve": "clojure -Teden serve :block? true",
+    "clean": "clojure -Teden clean",
+    "mcp-stdio": "clojure -Teden mcp-stdio :site-edn '\"site.edn\"'"
   },
   "devDependencies": {
     "esbuild": "^0.19.0"
